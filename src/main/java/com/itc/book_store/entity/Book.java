@@ -1,137 +1,55 @@
 package com.itc.book_store.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
+import lombok.*;
 import java.time.LocalDate;
 
+@Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
+@Table(name = "books")
 public class Book {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
 
+    @Column(name = "title")
     private String title;
+
+    @Column(name = "author")
     private String author;
+
+    @Column(name = "publisher")
     private String publisher;
+
+    @Column(name = "isbn")
     private String isbn;
+
+    @Column(name = "category")
     private String category;
+
+    @Lob
+    @Column(name = "description", nullable = false)
     private String description;
+
+    @Column(name = "price", nullable = false)
     private double price;
+
+    @Column(name = "stock", nullable = false)
     private int stock;
+
+    @Column(name = "cover_image_url")
     private String coverImageUrl;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    @Column(name = "publication_date")
     private LocalDate publicationDate;
-    private boolean isAvailable;
 
-    // --- Constructors ---
-    public Book() {}
-
-    public Book(String title, String author, String publisher, String isbn, String category,
-                String description, double price, int stock,
-                String coverImageUrl, LocalDate publicationDate, boolean isAvailable) {
-        this.title = title;
-        this.author = author;
-        this.publisher = publisher;
-        this.isbn = isbn;
-        this.category = category;
-        this.description = description;
-        this.price = price;
-        this.stock = stock;
-        this.coverImageUrl = coverImageUrl;
-        this.publicationDate = publicationDate;
-        this.isAvailable = isAvailable;
-    }
-
-    // --- Getters and Setters ---
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-
-    public String getPublisher() {
-        return publisher;
-    }
-
-    public void setPublisher(String publisher) {
-        this.publisher = publisher;
-    }
-
-    public String getIsbn() {
-        return isbn;
-    }
-
-    public void setIsbn(String isbn) {
-        this.isbn = isbn;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public double getPrice() {
-        return price;
-    }
-
-    public void setPrice(double price) {
-        this.price = price;
-    }
-
-    public int getStock() {
-        return stock;
-    }
-
-    public void setStock(int stock) {
-        this.stock = stock;
-    }
-
-    public String getCoverImageUrl() {
-        return coverImageUrl;
-    }
-
-    public void setCoverImageUrl(String coverImageUrl) {
-        this.coverImageUrl = coverImageUrl;
-    }
-
-    public LocalDate getPublicationDate() {
-        return publicationDate;
-    }
-
-    public void setPublicationDate(LocalDate publicationDate) {
-        this.publicationDate = publicationDate;
-    }
-
-    public boolean isAvailable() {
-        return isAvailable;
-    }
-
-    public void setAvailable(boolean available) {
-        isAvailable = available;
-    }
+    @Column(name = "available", nullable = false)
+    private boolean available;
 }

@@ -1,57 +1,36 @@
 package com.itc.book_store.services;
 
 import com.itc.book_store.entity.Book;
-import com.itc.book_store.Bookrepository.BookRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
-public class BookService {
+public interface BookService {
 
-    private final BookRepository bookRepository;
+    // ✅ Create a new book
+    Book createBook(String title,
+                    String author,
+                    String publisher,
+                    String isbn,
+                    String category,
+                    String description,
+                    double price,
+                    int stock,
+                    String publicationDateStr,
+                    boolean available,
+                    MultipartFile imageFile);
 
-    // Constructor Injection
-    @Autowired
-    public BookService(BookRepository bookRepository) {
-        this.bookRepository = bookRepository;
+    // ✅ Get a book by ID
+    Optional<Book> getBookById(Long id);
 
-    }
+    // ✅ Get all books — ADD THIS
+    List<Book> getAllBooks();
 
-    public List<Book> getAllBooks() {
-        return bookRepository.findAll();
-    }
+    // ✅ DELETE a book by ID → ADD THIS METHOD
+    void deleteBook(Long id);
 
-    public Book addBook(Book book) {
-        return bookRepository.save(book);
-    }
+    // ✅ Update a book by ID
+    Book updateBook(Long id, Book updatedBook, MultipartFile imageFile);
 
-    public Optional<Book> getBookById(Long id) {
-        return bookRepository.findById(id);
-    }
-
-    public void deleteBook(Long id) {
-        bookRepository.deleteById(id);
-    }
-
-    public Book updateBook(Long id, Book updatedBook) {
-        return bookRepository.findById(id)
-                .map(book -> {
-                    book.setTitle(updatedBook.getTitle());
-                    book.setAuthor(updatedBook.getAuthor());
-                    book.setPublisher(updatedBook.getPublisher());
-                    book.setIsbn(updatedBook.getIsbn());
-                    book.setCategory(updatedBook.getCategory());
-                    book.setDescription(updatedBook.getDescription());
-                    book.setPrice(updatedBook.getPrice());
-                    book.setStock(updatedBook.getStock());
-                    book.setCoverImageUrl(updatedBook.getCoverImageUrl());
-                    book.setPublicationDate(updatedBook.getPublicationDate());
-                    book.setAvailable(updatedBook.isAvailable());
-                    return bookRepository.save(book);
-                })
-                .orElseThrow(() -> new RuntimeException("Book not found with id " + id));
-    }
 }
