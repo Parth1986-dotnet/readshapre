@@ -29,14 +29,39 @@ function AddBook() {
     }));
   };
 
+  // ✅ Client-side image validation
   const handleImageChange = (e) => {
-    setImage(e.target.files[0]);
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    const extension = file.name.split('.').pop().toLowerCase();
+    const maxSize = 2 * 1024 * 1024; // 2MB
+
+    if (!allowedTypes.includes(file.type)) {
+      alert(`❌ Invalid file type. Only JPG and PNG images are allowed. You selected: ${file.type}`);
+      e.target.value = ''; // clear input
+      return;
+    }
+
+    if (!['jpg', 'jpeg', 'png'].includes(extension)) {
+      alert('❌ Only .jpg, .jpeg, and .png file extensions are allowed.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSize) {
+      alert('❌ Image size must be less than 2MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setImage(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (!myForm.title || !myForm.author || !myForm.price || !myForm.stock) {
       alert("❗ Title, Author, Price, and Stock are required.");
       return;
@@ -57,8 +82,8 @@ function AddBook() {
     formData.append("price", myForm.price);
     formData.append("stock", myForm.stock);
     formData.append("publicationDate", myForm.publicationDate);
-    formData.append("available", myForm.isAvailable.toString()); // ensure it's string
-    if (image) formData.append("image", image); // image file
+    formData.append("available", myForm.isAvailable.toString());
+    if (image) formData.append("image", image);
 
     setSubmitting(true);
     try {
@@ -67,17 +92,13 @@ function AddBook() {
         body: formData,
       });
 
-
       if (!res.ok) throw new Error("Upload failed");
 
       await res.json();
-      // ✅ Show success alert
-          alert("✅ Book uploaded successfully!");
-
-          // ✅ Navigate to book list after a short delay (optional)
-          setTimeout(() => {
-            navigate("/list");
-          }, 500); // 500ms delay after alert
+      alert("✅ Book uploaded successfully!");
+      setTimeout(() => {
+        navigate("/list");
+      }, 500);
     } catch (err) {
       console.error(err);
       alert("❌ Failed to upload book. Check console for details.");

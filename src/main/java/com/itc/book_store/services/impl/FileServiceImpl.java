@@ -29,28 +29,56 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public FileUploadResponse uploadFile(MultipartFile file) {
-        FileUploadResponse resp = new FileUploadResponse();
-        try {
-            String datePath = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
-            String key = datePath + "/" + file.getOriginalFilename();
+        // ✅ Validation: null or empty
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("❌ File is empty or missing.");
+        }
 
+        // ✅ Validation: allowed types
+        String contentType = file.getContentType();
+        if (!("image/jpeg".equals(contentType) || "image/png".equals(contentType))) {
+            throw new IllegalArgumentException("❌ Only JPG and PNG images are allowed.");
+        }
+
+        // ✅ Validation: file size (max 2MB)
+        long maxSize = 2 * 1024 * 1024; // 2MB
+        if (file.getSize() > maxSize) {
+            throw new IllegalArgumentException("❌ File size exceeds 2MB limit.");
+        }
+
+        FileUploadResponse resp = new FileUploadResponse();
+
+        try {
+            // ✅ Sanitize file name and build unique S3 key
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null ? originalFilename.substring(originalFilename.lastIndexOf('.')) : "";
+            String sanitizedFilename = System.currentTimeMillis() + "_" + java.util.UUID.randomUUID() + extension;
+
+            String datePath = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+            String key = datePath + "/" + sanitizedFilename;
+
+            // ✅ Set metadata
             ObjectMetadata meta = new ObjectMetadata();
             meta.setContentLength(file.getSize());
-            meta.setContentType(file.getContentType());
+            meta.setContentType(contentType);
 
+            // ✅ Upload to S3
             s3Client.putObject(bucketName, key, file.getInputStream(), meta);
 
             String url = s3Client.getUrl(bucketName, key).toString();
 
+            // ✅ Build response
             resp.setFilePath(key);
             resp.setFileUrl(url);
             resp.setUploadedAt(LocalDateTime.now());
 
             return resp;
+
         } catch (IOException ex) {
-            log.error("File upload failed: {}", ex.getMessage());
+            log.error("❌ File upload failed: {}", ex.getMessage());
             throw new RuntimeException("Failed to upload file", ex);
         }
     }
+
 }
 
