@@ -1,6 +1,8 @@
 // src/pages/BookList.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+//import api from '../axiosConfig';  // <== Add this import!
+import axiosConfig from '../axiosConfig'; // Ensure this is the correct path to your axios config
 
 function BookList() {
   const [books, setBooks] = useState([]);
@@ -13,28 +15,51 @@ function BookList() {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetch('http://localhost:8081/api/books')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch books');
-        return res.json();
+  //useEffect(() => {
+    //fetch('http://localhost:8081/api/books')
+      //.then(res => {
+        //if (!res.ok) throw new Error('Failed to fetch books');
+        //return res.json();
+      //})
+
+      //.then(data => setBooks(data))
+      //.catch(err => setError(err.message))
+      //.finally(() => setLoading(false));
+  //}, []);
+
+
+    useEffect(() => {
+      const token = localStorage.getItem('accessToken'); // likely key you use
+
+      fetch('http://localhost:8081/api/books', {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
       })
-      .then(data => setBooks(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch books');
+          return res.json();
+        })
+        .then(data => setBooks(data))
+        .catch(err => setError(err.message))
+        .finally(() => setLoading(false));
+    }, []);
+
 
   const handleDelete = (id) => {
     if (!window.confirm('Are you sure you want to delete this book?')) return;
 
     fetch(`http://localhost:8081/api/books/${id}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+      }
     })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to delete');
-        setBooks(prev => prev.filter(book => book.id !== id));
-      })
-      .catch(err => alert(`❌ Error: ${err.message}`));
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to delete');
+      setBooks(prev => prev.filter(book => book.id !== id));
+    })
+    .catch(err => alert(`❌ Error: ${err.message}`));
   };
 
   const handleEdit = (id) => {
@@ -111,11 +136,11 @@ function BookList() {
                 <td>{book.author}</td>
                 <td>{book.category || '-'}</td>
                 <td>{book.price?.toFixed(2)}</td>
-                <td>
-                  <span className={`badge bg-${book.available ? 'success' : 'secondary'}`}>
-                    {book.available ? 'Available' : 'Out of stock'}
-                  </span>
-                </td>
+               <td>
+                 <span className={`badge bg-${book.available === true ? 'success' : 'danger'}`}>
+                   {book.available === true ? 'Available' : 'Unavailable'}
+                 </span>
+               </td>
                 <td>
                   <button
                     className="btn btn-sm btn-outline-primary me-2"

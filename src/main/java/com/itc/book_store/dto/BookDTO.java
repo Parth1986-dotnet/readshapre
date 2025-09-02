@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
@@ -24,7 +25,7 @@ public class BookDTO {
 
     private String description;
 
-    private double price;
+    private BigDecimal price;
 
     private int stock;
 

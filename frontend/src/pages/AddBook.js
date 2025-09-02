@@ -87,9 +87,14 @@ function AddBook() {
 
     setSubmitting(true);
     try {
+      const token = localStorage.getItem('accessToken');
+
       const res = await fetch("http://localhost:8081/api/books", {
         method: "POST",
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) throw new Error("Upload failed");

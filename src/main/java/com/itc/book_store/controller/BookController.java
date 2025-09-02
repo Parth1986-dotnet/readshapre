@@ -8,14 +8,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 
 @RestController
 @RequestMapping("/api/books")
-@CrossOrigin(origins = "*")  // You can restrict this to your frontend URL in production
+//@CrossOrigin(origins = "*")  // You can restrict this to your frontend URL in production
 public class BookController {
 
     @Value("${file.upload-dir:uploads}")
@@ -30,6 +36,7 @@ public class BookController {
     }
 
     // Get all books
+    //@PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<List<Book>> getAllBooks() {
         List<Book> books = bookService.getAllBooks();
@@ -40,6 +47,7 @@ public class BookController {
     }
 
     // ✅ Get book by ID (for editing)
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
         return bookService.getBookById(id)
@@ -49,6 +57,7 @@ public class BookController {
 
 
     // Create book
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("")
     public ResponseEntity<Book> createBook(
             @RequestParam("title") String title,
@@ -63,11 +72,14 @@ public class BookController {
             @RequestParam("available") boolean available,
             @RequestParam("image") MultipartFile imageFile) {
 
-        Book saved = bookService.createBook(title, author, publisher, isbn, category, description, price, stock, publicationDateStr, available, imageFile);
+        BigDecimal priceDecimal = BigDecimal.valueOf(price);
+
+        Book saved = bookService.createBook(title, author, publisher, isbn, category, description, priceDecimal, stock, publicationDateStr, available, imageFile);
         return ResponseEntity.ok(saved);
     }
 
     // Update book by ID with optional image file
+
     @PutMapping("/{id}")
     public ResponseEntity<Book> updateBook(
             @PathVariable Long id,
@@ -77,7 +89,8 @@ public class BookController {
             @RequestParam("isbn") String isbn,
             @RequestParam("category") String category,
             @RequestParam(value = "description", required = false) String description,
-            @RequestParam("price") double price,
+            //@RequestParam("price") double price,
+            @RequestParam("price") BigDecimal price, // ✅ Changed from double
             @RequestParam("stock") int stock,
             @RequestParam("publicationDate") String publicationDateStr,
             @RequestParam("available") boolean available,
@@ -102,9 +115,20 @@ public class BookController {
 
 
     // Delete book
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable Long id) {
         bookService.deleteBook(id);
         return ResponseEntity.noContent().build();
     }
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Integer>> getBookStats() {
+        Map<String, Integer> stats = bookService.getBookStats();
+        return ResponseEntity.ok(stats);
+    }
+
+
+
+
 }

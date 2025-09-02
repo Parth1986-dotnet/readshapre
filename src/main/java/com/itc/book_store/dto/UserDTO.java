@@ -1,9 +1,12 @@
 package com.itc.book_store.dto;
 
+import com.itc.book_store.Enum.RoleName;
+
 public class UserDTO {
     private Long id;
     private String username;
     private RoleName role;
+    private String email; // Optional: Add email if needed
 
     // Constructors
     public UserDTO() {}

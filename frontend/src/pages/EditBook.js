@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axiosConfig from '../axiosConfig';
 
 function EditBook() {
   const { id } = useParams();
@@ -23,29 +24,27 @@ function EditBook() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:8081/api/books/${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch book data');
-        return res.json();
-      })
-      .then((data) => {
+    // Load book data on mount
+    axiosConfig.get(`/api/books/${id}`)
+      .then(res => {
+        const data = res.data;
         setMyForm({
-          title: data.title,
-          author: data.author,
-          publisher: data.publisher,
-          isbn: data.isbn,
-          category: data.category,
-          description: data.description,
-          price: data.price,
-          stock: data.stock,
-          publicationDate: data.publicationDate,
-          isAvailable: data.available,
-          coverImageUrl: data.coverImageUrl,
+          title: data.title || '',
+          author: data.author || '',
+          publisher: data.publisher || '',
+          isbn: data.isbn || '',
+          category: data.category || '',
+          description: data.description || '',
+          price: data.price || '',
+          stock: data.stock || '',
+          publicationDate: data.publicationDate ? data.publicationDate.split('T')[0] : '',
+          isAvailable: data.available !== undefined ? data.available : true,
+          coverImageUrl: data.coverImageUrl || '',
         });
         setLoading(false);
       })
-      .catch((err) => {
-        console.error(err);
+      .catch(err => {
+        console.error('Failed to load book data:', err);
         alert('❌ Failed to load book data.');
         navigate('/list');
       });
@@ -53,7 +52,7 @@ function EditBook() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setMyForm((prev) => ({
+    setMyForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
@@ -75,24 +74,22 @@ function EditBook() {
     formData.append('description', myForm.description);
     formData.append('price', myForm.price);
     formData.append('stock', myForm.stock);
-    formData.append('publicationDate', myForm.publicationDate);
+    formData.append('publicationDate', myForm.publicationDate || '');
     formData.append('available', myForm.isAvailable.toString());
     if (image) {
       formData.append('image', image);
     }
 
     try {
-      const res = await fetch(`http://localhost:8081/api/books/${id}`, {
-        method: 'PUT',
-        body: formData,
+      await axiosConfig.put(`/api/books/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
-
-      if (!res.ok) throw new Error('Update failed');
-
       alert('✅ Book updated successfully!');
       navigate('/list');
     } catch (err) {
-      console.error(err);
+      console.error('Failed to update book:', err);
       alert('❌ Failed to update book.');
     }
   };
@@ -235,7 +232,7 @@ function EditBook() {
                   className="form-control"
                   value={myForm.description}
                   onChange={handleChange}
-                ></textarea>
+                />
               </div>
 
               {/* Availability */}

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
+import java.math.BigDecimal; // ✅ added
 
 @Builder
 @Data
@@ -37,9 +38,12 @@ public class Book {
     @Column(name = "description", nullable = false)
     private String description;
 
-    @Column(name = "price", nullable = false)
-    private double price;
+//    @Column(name = "price", nullable = false)
+//    private double price;
 
+    @Column(name = "price", nullable = false)
+    //private Double price; // ✅ Changed from double
+    private BigDecimal price;
     @Column(name = "stock", nullable = false)
     private int stock;
 
@@ -52,4 +56,8 @@ public class Book {
 
     @Column(name = "available", nullable = false)
     private boolean available;
+
+    
+
+
 }

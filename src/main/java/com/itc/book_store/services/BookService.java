@@ -3,8 +3,10 @@ package com.itc.book_store.services;
 import com.itc.book_store.entity.Book;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 public interface BookService {
 
@@ -15,7 +17,7 @@ public interface BookService {
                     String isbn,
                     String category,
                     String description,
-                    double price,
+                    BigDecimal price,
                     int stock,
                     String publicationDateStr,
                     boolean available,
@@ -32,5 +34,7 @@ public interface BookService {
 
     // ✅ Update a book by ID
     Book updateBook(Long id, Book updatedBook, MultipartFile imageFile);
+
+    Map<String, Integer> getBookStats();
 
 }
