@@ -11,3 +11,42 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* --- your original base styles --- */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* --- Quick Preview (binoculars) hover reveal --- */
+.book-card .book-card-preview-btn {
+  opacity: 0;
+  transition: opacity .15s ease-in-out;
+}
+.book-card:hover .book-card-preview-btn,
+.book-card:focus-within .book-card-preview-btn {
+  opacity: 1;
+}
+
+/* Optional: subtle zoom for the cover inside the preview modal */
+.modal-body img {
+  transition: transform .2s ease-in-out;
+}
+.modal-body img:hover {
+  transform: scale(1.03);
+}
+
+/* Full-screen overlay for the quick preview modal */
+.preview-overlay {
+  z-index: 9999;                 /* keep above headers/sidebars */
+  background: rgba(0,0,0,.5);
+  min-height: 100vh;
+}

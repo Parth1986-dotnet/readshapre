@@ -70,13 +70,20 @@ public class BookController {
             @RequestParam("stock") int stock,
             @RequestParam("publicationDate") String publicationDateStr,
             @RequestParam("available") boolean available,
-            @RequestParam("image") MultipartFile imageFile) {
+            @RequestParam("image") MultipartFile imageFile,
 
+            // ✅ ADD THIS
+            @RequestParam(value = "previewText", required = false) String previewText
+    ) {
         BigDecimal priceDecimal = BigDecimal.valueOf(price);
 
-        Book saved = bookService.createBook(title, author, publisher, isbn, category, description, priceDecimal, stock, publicationDateStr, available, imageFile);
+        Book saved = bookService.createBook(
+                title, author, publisher, isbn, category, description,
+                priceDecimal, stock, publicationDateStr, available, imageFile, previewText
+        );
         return ResponseEntity.ok(saved);
     }
+
 
     // Update book by ID with optional image file
 
@@ -94,7 +101,9 @@ public class BookController {
             @RequestParam("stock") int stock,
             @RequestParam("publicationDate") String publicationDateStr,
             @RequestParam("available") boolean available,
-            @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            @RequestParam(value = "previewText", required = false) String previewText
+            ) {
 
         Book updatedBook = Book.builder()
                 .title(title)
@@ -107,6 +116,7 @@ public class BookController {
                 .stock(stock)
                 .publicationDate(LocalDate.parse(publicationDateStr))
                 .available(available)
+                .previewText(previewText)
                 .build();
 
         Book updated = bookService.updateBook(id, updatedBook, imageFile);
@@ -126,6 +136,18 @@ public class BookController {
     public ResponseEntity<Map<String, Integer>> getBookStats() {
         Map<String, Integer> stats = bookService.getBookStats();
         return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<String> getBookPreview(@PathVariable Long id) {
+        return bookService.getBookById(id)
+                .map(book -> {
+                    if (book.getPreviewText() == null || book.getPreviewText().isBlank()) {
+                        return ResponseEntity.status(HttpStatus.NO_CONTENT).body("");
+                    }
+                    return ResponseEntity.ok(book.getPreviewText());
+                })
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Book not found"));
     }
 
 

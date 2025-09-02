@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+// src/pages/AllBooksPage.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import BookCard from "../components/BookCard";
 import { useCart } from "../context/CartContext";
+import BookMagnifier from "../components/BookMagnifier"; // ✅ magnifier component
 
 function AllBooksPage() {
   const [books, setBooks] = useState([]);
@@ -14,20 +16,31 @@ function AllBooksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [previewBook, setPreviewBook] = useState(null);
+
   const { addToCart } = useCart();
+
+  // Close preview on Escape
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && setPreviewBook(null);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // Fetch all books
   useEffect(() => {
+    setLoading(true);
     fetch("http://localhost:8081/api/books")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch books");
         return res.json();
       })
       .then((data) => {
-        // Add fallback image for all books
-        const booksWithImages = data.map((book) => ({
+        const booksWithImages = (data || []).map((book) => ({
           ...book,
-          imageUrl: book.imageUrl || "https://via.placeholder.com/200x280?text=Book+Image",
+          imageUrl:
+            book.imageUrl ||
+            "https://via.placeholder.com/200x280?text=Book+Image",
         }));
 
         setBooks(booksWithImages);
@@ -37,31 +50,35 @@ function AllBooksPage() {
           (book) => book.releaseDate && new Date(book.releaseDate) > today
         );
         setUpcomingBooks(upcoming);
-
-        console.log("Fetched books:", booksWithImages);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
-  const categories = [...new Set(books.map((book) => book.category).filter(Boolean))];
+  const categories = useMemo(
+    () => [...new Set(books.map((b) => b.category).filter(Boolean))],
+    [books]
+  );
 
-  const filteredBooks = books.filter((book) => {
-    const matchesSearch = [book.title, book.author, book.category, book.price?.toString()]
-      .some((field) => field?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredBooks = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return books.filter((book) => {
+      const matchesSearch = [book.title, book.author, book.category, book.price?.toString()].some(
+        (f) => f?.toString().toLowerCase().includes(term)
+      );
+      const matchesCategory = selectedCategory ? book.category === selectedCategory : true;
+      return matchesSearch && matchesCategory;
+    });
+  }, [books, searchTerm, selectedCategory]);
 
-    const matchesCategory = selectedCategory ? book.category === selectedCategory : true;
-
-    return matchesSearch && matchesCategory;
-  });
-
-  const sortedBooks = [...filteredBooks].sort((a, b) => {
-    if (sortOption === "priceLowHigh") return a.price - b.price;
-    if (sortOption === "priceHighLow") return b.price - a.price;
-    if (sortOption === "titleAZ") return a.title.localeCompare(b.title);
-    if (sortOption === "titleZA") return b.title.localeCompare(a.title);
-    return 0;
-  });
+  const sortedBooks = useMemo(() => {
+    const arr = [...filteredBooks];
+    if (sortOption === "priceLowHigh") arr.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    if (sortOption === "priceHighLow") arr.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    if (sortOption === "titleAZ") arr.sort((a, b) => a.title.localeCompare(b.title));
+    if (sortOption === "titleZA") arr.sort((a, b) => b.title.localeCompare(a.title));
+    return arr;
+  }, [filteredBooks, sortOption]);
 
   const totalPages = Math.ceil(sortedBooks.length / booksPerPage);
   const startIndex = (currentPage - 1) * booksPerPage;
@@ -75,10 +92,7 @@ function AllBooksPage() {
       {/* Hero Banner */}
       <div
         className="p-4 mb-5 rounded-3 text-center shadow"
-        style={{
-          background: "linear-gradient(135deg, #f9f9f9, #ececec)",
-          color: "#333",
-        }}
+        style={{ background: "linear-gradient(135deg, #f9f9f9, #ececec)", color: "#333" }}
       >
         <h2 className="fw-bold">🎉 Summer Reading Sale - Up to 40% Off!</h2>
         <p>Grab your favorite books before the offer ends! 📚✨</p>
@@ -91,7 +105,12 @@ function AllBooksPage() {
           <div className="d-flex overflow-auto gap-3 p-2">
             {upcomingBooks.map((book) => (
               <div key={book.id} style={{ minWidth: "220px" }}>
-                <BookCard book={book} upcoming />
+                <BookCard
+                  book={book}
+                  upcoming
+                  onAddToCart={addToCart}
+                  onPreview={(b) => setPreviewBook(b)}
+                />
               </div>
             ))}
           </div>
@@ -148,7 +167,11 @@ function AllBooksPage() {
       <div className="row row-cols-1 row-cols-md-3 row-cols-lg-3 g-4">
         {currentBooks.map((book) => (
           <div key={book.id} className="col d-flex">
-            <BookCard book={book} onAddToCart={addToCart} />
+            <BookCard
+              book={book}
+              onAddToCart={addToCart}
+              onPreview={(b) => setPreviewBook(b)}
+            />
           </div>
         ))}
       </div>
@@ -157,7 +180,7 @@ function AllBooksPage() {
       {totalPages > 1 && (
         <nav className="mt-4">
           <ul className="pagination justify-content-center">
-            {[...Array(totalPages)].map((_, idx) => (
+            {Array.from({ length: totalPages }).map((_, idx) => (
               <li
                 key={idx}
                 className={`page-item ${currentPage === idx + 1 ? "active" : ""}`}
@@ -169,6 +192,139 @@ function AllBooksPage() {
             ))}
           </ul>
         </nav>
+      )}
+
+      {/* Quick Preview Modal (pure React, no bootstrap JS needed) */}
+      {previewBook && (
+        <div
+          className="fixed-top d-flex align-items-center justify-content-center"
+          style={{ background: "rgba(0,0,0,.5)", minHeight: "100vh", zIndex: 1050 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bookPreviewTitle"
+          onClick={() => setPreviewBook(null)}
+        >
+          <div
+            className="modal-dialog modal-lg modal-dialog-centered"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header">
+                <h5 className="modal-title" id="bookPreviewTitle">
+                  {previewBook.title || "Untitled"}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Close"
+                  onClick={() => setPreviewBook(null)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="row g-4">
+                  {/* ✅ Magnifier used here */}
+                  <div className="col-12 col-md-5">
+                    <BookMagnifier
+                      src={
+                        previewBook.imageUrl ||
+                        "https://via.placeholder.com/400x560?text=Book+Image"
+                      }
+                      alt={previewBook.title || "Book cover"}
+                      zoom={2.5}      // tweak 2.0–3.0
+                      lensSize={180}  // tweak 140–220
+                    />
+                  </div>
+
+                  <div className="col-12 col-md-7">
+                    <div className="d-flex flex-column gap-2">
+                      <div className="text-muted small">by</div>
+                      <div className="fw-semibold">
+                        {previewBook.author || "Unknown"}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mt-2">
+                        {previewBook.category && (
+                          <span className="badge bg-light text-secondary">
+                            {previewBook.category}
+                          </span>
+                        )}
+                        {previewBook.releaseDate && (
+                          <span className="badge bg-warning text-dark">
+                            Releases{" "}
+                            {new Date(previewBook.releaseDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="fs-4 fw-bold mt-2">
+                        {previewBook.price != null
+                          ? `₹${Number(previewBook.price).toFixed(2)}`
+                          : "—"}
+                      </div>
+
+                      {previewBook.description && (
+                        <p className="text-muted mt-2" style={{ whiteSpace: "pre-wrap" }}>
+                          {previewBook.description}
+                        </p>
+                      )}
+
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          className="btn btn-dark"
+                          onClick={() => {
+                            addToCart(previewBook);
+                            setPreviewBook(null);
+                          }}
+                        >
+                          Add to Cart
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary ms-2"
+                          onClick={() => setPreviewBook(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick facts */}
+                <div className="table-responsive mt-4">
+                  <table className="table table-sm align-middle">
+                    <tbody>
+                      <tr>
+                        <th className="w-25">Title</th>
+                        <td>{previewBook.title || "—"}</td>
+                      </tr>
+                      <tr>
+                        <th>Author</th>
+                        <td>{previewBook.author || "—"}</td>
+                      </tr>
+                      <tr>
+                        <th>Category</th>
+                        <td>{previewBook.category || "—"}</td>
+                      </tr>
+                      <tr>
+                        <th>Price</th>
+                        <td>
+                          {previewBook.price != null
+                            ? `₹${Number(previewBook.price).toFixed(2)}`
+                            : "—"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {/* /quick facts */}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

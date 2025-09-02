@@ -21,7 +21,8 @@ public interface BookService {
                     int stock,
                     String publicationDateStr,
                     boolean available,
-                    MultipartFile imageFile);
+                    MultipartFile imageFile,
+                    String previewText); // ✅ ADD THIS
 
     // ✅ Get a book by ID
     Optional<Book> getBookById(Long id);

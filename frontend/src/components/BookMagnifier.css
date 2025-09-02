@@ -1,0 +1,35 @@
+.rs-magnifier-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-height: 460px;
+  overflow: hidden;
+}
+
+.rs-magnifier-container img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  user-select: none;
+}
+
+.rs-magnifier-lens {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  pointer-events: none; /* let mouse/touch go to the image */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  background-color: #fff;
+  box-shadow:
+    0 0 0 7px rgba(255, 255, 255, 0.55),
+    0 0 7px 7px rgba(0, 0, 0, 0.25),
+    inset 0 0 40px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rs-magnifier-lens.rs-show {
+  opacity: 1;
+}

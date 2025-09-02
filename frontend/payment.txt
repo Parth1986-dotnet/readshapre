@@ -1,0 +1,34 @@
+4659 4226 3926 8665
+
+11- 27 844
+
+
+
+@Override
+    @Transactional
+    public CreatePaymentIntentResponse createPaymentIntent(CreatePaymentIntentRequest req, Long currentUserId) {
+        // Validate amount/currency against Order from your OrderService (pseudo-code):
+        // Order order = orderService.requireOwnedOrder(req.getOrderId(), currentUserId);
+        // BigDecimal expected = order.getGrandTotal();
+        // if (req.getAmount().compareTo(expected) != 0) throw new IllegalArgumentException("Amount mismatch");
+
+        Payment payment = new Payment()
+                .setOrderId(req.getOrderId())
+                .setUserId(currentUserId)
+                .setAmount(req.getAmount())
+                .setCurrency(Optional.ofNullable(req.getCurrency()).orElse(defaultCurrency))
+                .setStatus(PaymentStatus.REQUIRES_PAYMENT_METHOD)
+                .setProvider(provider.providerName())
+                .setMetadata(req.getMetadata());
+
+        payment = paymentRepository.save(payment);
+
+        // Idempotency key per order/payment try
+        String idempotencyKey = payment.getId().toString();
+
+        CreatePaymentIntentResponse resp = provider.createPaymentIntent(req, payment, idempotencyKey);
+        // store provider payment id
+        payment.setProviderPaymentId(resp.getProviderPaymentId());
+        paymentRepository.save(payment);
+        return resp;
+    } checkout...

@@ -57,7 +57,8 @@ public class Book {
     @Column(name = "available", nullable = false)
     private boolean available;
 
-    
-
+    @Lob
+    @Column(name = "preview_text", columnDefinition = "TEXT")
+    private String previewText;
 
 }

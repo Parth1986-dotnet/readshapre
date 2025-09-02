@@ -27,8 +27,6 @@
 
         private final FileService fileService;
 
-
-
         @Override
         public Book createBook(String title,
                                String author,
@@ -40,7 +38,8 @@
                                int stock,
                                String publicationDateStr,
                                boolean available,
-                               MultipartFile imageFile) {
+                               MultipartFile imageFile,
+                               String previewText) { // ✅ must match
 
             FileUploadResponse upload = fileService.uploadFile(imageFile);
 
@@ -51,11 +50,12 @@
                     .category(category)
                     .isbn(isbn)
                     .description(description)
-                    .price(price)// ✅ converts double to BigDecimal
+                    .price(price)
                     .stock(stock)
                     .publicationDate(LocalDate.parse(publicationDateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd")))
                     .available(available)
                     .coverImageUrl(upload.getFileUrl())
+                    .previewText(previewText) // ✅ include previewText
                     .build();
 
             return bookRepository.save(book);
@@ -91,6 +91,9 @@
                         book.setPublicationDate(updatedBook.getPublicationDate());
                         book.setAvailable(updatedBook.isAvailable());
 
+                        // ✅ THIS WAS MISSING
+                        book.setPreviewText(updatedBook.getPreviewText());
+
                         if (imageFile != null && !imageFile.isEmpty()) {
                             FileUploadResponse upload = fileService.uploadFile(imageFile);
                             book.setCoverImageUrl(upload.getFileUrl());
@@ -99,7 +102,8 @@
                         return bookRepository.save(book);
                     })
                     .orElseThrow(() -> new RuntimeException("Book not found with id: " + id));
-            }
+        }
+
 
         @Override
         public Map<String, Integer> getBookStats() {
