@@ -96,4 +96,11 @@ public class JwtUtil {
                 .getBody()
                 .getSubject();
     }
+
+    // ✅ Add this getter
+    public long getExpirationMs() {
+        return expirationMs;
+    }
 }
+
+

@@ -14,11 +14,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.Customizer;
-import static org.springframework.security.config.Customizer.withDefaults;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.web.cors.CorsConfiguration;
 
-
+import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
@@ -32,20 +31,36 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
-                .cors(withDefaults())
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .cors(cors -> cors.configurationSource(request -> {
+                    CorsConfiguration config = new CorsConfiguration();
+                    config.setAllowedOrigins(List.of("http://localhost:3000"));
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+                    config.setAllowCredentials(true);
+                    config.setMaxAge(3600L);
+                    return config;
+                }))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Public
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/users/register", "/error").permitAll()
-                        .requestMatchers("/ws/**").permitAll() // <-- allow websocket handshake
-                        //.requestMatchers("/api/books/**").authenticated()
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/books/**").permitAll()
-                        .requestMatchers("/api/users/profile").authenticated()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/orders/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/api/orders/**").authenticated()
                         .requestMatchers("/api/payments/webhook").permitAll()
+
+                        // User profile
+                        .requestMatchers("/api/users/profile").authenticated()
+
+                        // Orders
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")   // ✅ place order
+                        .requestMatchers("/api/orders/my").hasRole("USER")                 // ✅ my orders
+                        .requestMatchers("/api/orders/**").hasRole("ADMIN")                // ✅ admin orders
+
+                        // Admin section
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // Everything else
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -55,7 +70,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(customUserDetailsService); // deprecated but still works
+        provider.setUserDetailsService(customUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }

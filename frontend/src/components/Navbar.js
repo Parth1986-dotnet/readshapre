@@ -1,14 +1,12 @@
-// src/components/Navbar.js
 import React, { useEffect, useState, useRef } from "react";
 import { BsBell, BsBoxArrowRight, BsCart, BsBoxArrowInRight, BsPersonPlus } from "react-icons/bs";
 import { useNavigate, Link } from "react-router-dom";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import jwtDecode from "jwt-decode";
+import axios from "../axiosConfig";
 
 function Navbar() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("accessToken");
 
   const [notifications, setNotifications] = useState([]);
   const [cartItems, setCartItems] = useState([]);
@@ -18,21 +16,20 @@ function Navbar() {
 
   const dropdownRef = useRef();
 
-  // Decode JWT to extract email + roles
+  // ✅ Fetch logged-in user profile using cookie
   useEffect(() => {
-    if (!token) return;
-    try {
-      const decoded = jwtDecode(token);
-      const email = decoded.email || decoded.sub || null;
-      setUserEmail(email);
-      const roles = decoded.roles || [];
-      setIsAdmin(roles.includes("ROLE_ADMIN"));
-    } catch (err) {
-      console.error("Invalid token:", err);
-    }
-  }, [token]);
+    axios.get("/api/users/profile", { withCredentials: true })
+      .then(res => {
+        setUserEmail(res.data.username);
+        setIsAdmin(res.data.role === "ROLE_ADMIN");
+      })
+      .catch(() => {
+        setUserEmail(null);
+        setIsAdmin(false);
+      });
+  }, []);
 
-  // WebSocket notifications
+  // WebSocket notifications (works after userEmail is set)
   useEffect(() => {
     if (!userEmail) return;
 
@@ -58,7 +55,6 @@ function Navbar() {
               date: data.updatedAt || new Date().toLocaleString(),
             };
             setNotifications((prev) => [...prev, message]);
-            console.log("Received notification:", message);
           } catch (err) {
             console.warn("Invalid message body:", msg.body);
           }
@@ -89,8 +85,14 @@ function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
+  const handleLogout = async () => {
+    try {
+      await axios.post("/api/auth/logout", {}, { withCredentials: true }); // ✅ clears cookie
+    } catch (err) {
+      console.warn("Logout failed:", err);
+    }
+    localStorage.removeItem("refreshToken");
+    setUserEmail(null);
     navigate("/login");
   };
 
@@ -107,24 +109,21 @@ function Navbar() {
       <span className="navbar-brand">📚 Read Sphere</span>
 
       <div className="ms-auto text-light d-flex align-items-center">
-        {/* Show user email if logged in */}
         {userEmail && <span className="me-3">👤 {userEmail}</span>}
 
-        {/* Notifications - only show if logged in */}
+        {/* Notifications */}
         {userEmail && (
           <div
             className="btn btn-outline-light btn-sm me-2 position-relative"
             onClick={() => setShowDropdown((prev) => !prev)}
             ref={dropdownRef}
           >
-            <div className="position-relative">
-              <BsBell size={20} />
-              {notifications.length > 0 && (
-                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                  {notifications.length}
-                </span>
-              )}
-            </div>
+            <BsBell size={20} />
+            {notifications.length > 0 && (
+              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                {notifications.length}
+              </span>
+            )}
 
             {showDropdown && (
               <div
@@ -143,34 +142,23 @@ function Navbar() {
                         Mark all as read
                       </button>
                     </div>
-                    {notifications
-                      .slice()
-                      .reverse()
-                      .map((notif, index) => (
-                        <div
-                          key={index}
-                          className={`border-bottom py-1 ${getStatusColor(
-                            notif.status
-                          )}`}
-                          style={{ fontSize: "0.85rem", cursor: "pointer" }}
-                          onClick={() =>
-                            setNotifications((prev) =>
-                              prev.filter(
-                                (_, i) =>
-                                  i !== notifications.length - 1 - index
-                              )
-                            )
-                          }
-                        >
-                          {notif.text} <br />
-                          <span
-                            className="text-muted"
-                            style={{ fontSize: "0.75rem" }}
-                          >
-                            {notif.date}
-                          </span>
-                        </div>
-                      ))}
+                    {notifications.slice().reverse().map((notif, index) => (
+                      <div
+                        key={index}
+                        className={`border-bottom py-1 ${getStatusColor(notif.status)}`}
+                        style={{ fontSize: "0.85rem", cursor: "pointer" }}
+                        onClick={() =>
+                          setNotifications((prev) =>
+                            prev.filter((_, i) => i !== notifications.length - 1 - index)
+                          )
+                        }
+                      >
+                        {notif.text} <br />
+                        <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                          {notif.date}
+                        </span>
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
@@ -178,44 +166,30 @@ function Navbar() {
           </div>
         )}
 
-        {/* Shopping Cart */}
+        {/* Cart */}
         {userEmail && (
-          <Link
-            to="/cart"
-            className="btn btn-outline-light btn-sm me-2 position-relative"
-          >
-            <div className="position-relative">
-              <BsCart size={20} />
-              {cartCount > 0 && (
-                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success">
-                  {cartCount}
-                </span>
-              )}
-            </div>
+          <Link to="/cart" className="btn btn-outline-light btn-sm me-2 position-relative">
+            <BsCart size={20} />
+            {cartCount > 0 && (
+              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success">
+                {cartCount}
+              </span>
+            )}
           </Link>
         )}
 
-        {/* Show Login + Register buttons if NOT logged in */}
+        {/* Auth buttons */}
         {!userEmail ? (
           <>
-            <button
-              className="btn btn-outline-primary btn-sm me-2"
-              onClick={() => navigate("/login")}
-            >
+            <button className="btn btn-outline-primary btn-sm me-2" onClick={() => navigate("/login")}>
               <BsBoxArrowInRight className="me-1" /> Login
             </button>
-            <button
-              className="btn btn-outline-success btn-sm"
-              onClick={() => navigate("/register")}
-            >
+            <button className="btn btn-outline-success btn-sm" onClick={() => navigate("/register")}>
               <BsPersonPlus className="me-1" /> Register
             </button>
           </>
         ) : (
-          <button
-            className="btn btn-outline-danger btn-sm"
-            onClick={handleLogout}
-          >
+          <button className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
             <BsBoxArrowRight className="me-1" /> Logout
           </button>
         )}

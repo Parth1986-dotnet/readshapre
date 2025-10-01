@@ -3,42 +3,34 @@ import { useNavigate } from "react-router-dom";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import jwtDecode from "jwt-decode";
+import axiosConfig from "../axiosConfig"; // ✅ central axios instance
 
 function MyOrdersPage() {
   const [orders, setOrders] = useState([]);
   const navigate = useNavigate();
 
-  // Fetch user's orders from backend
+  // ✅ Fetch user's orders via /my
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          navigate("/login");
-          return;
-        }
-
-        const res = await fetch("http://localhost:8081/api/orders/my", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setOrders(data);
-        } else if (res.status === 401) {
-          navigate("/login");
-        } else {
-          console.error("Failed to fetch orders");
-        }
+        const res = await axiosConfig.get("/api/orders/my");
+        setOrders(res.data || []);
       } catch (err) {
-        console.error("Error fetching orders:", err);
+        if (err.response?.status === 401) {
+          navigate("/login");
+        } else if (err.response?.status === 403) {
+          alert("Not authorized to view orders.");
+          navigate("/");
+        } else {
+          console.error("Failed to fetch orders:", err);
+        }
       }
     };
 
     fetchOrders();
   }, [navigate]);
 
-  // Subscribe to WebSocket notifications for order status updates
+  // ✅ Subscribe to WebSocket for real-time order updates
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
@@ -51,7 +43,7 @@ function MyOrdersPage() {
       return;
     }
 
-    const userEmail = decoded.email || decoded.sub;
+    const userEmail = decoded.sub; // ✅ reliable claim for email/username
     if (!userEmail) return;
 
     const client = new Client({
@@ -59,13 +51,15 @@ function MyOrdersPage() {
       reconnectDelay: 5000,
       debug: (str) => console.log("[STOMP]", str),
       onConnect: () => {
-        console.log("Connected to WebSocket");
-        client.subscribe(`/topic/notifications/${userEmail}`, (msg) => {
+        console.log("Connected to WebSocket ✅");
+        const topic = `/topic/notifications/user/${encodeURIComponent(userEmail)}`;
+        console.log("Subscribing to topic:", topic);
+
+        client.subscribe(topic, (msg) => {
           if (!msg.body) return;
           const data = JSON.parse(msg.body);
-          console.log("Received notification:", data);
 
-          // Update order status in state
+          // Update order status in UI
           setOrders((prev) =>
             prev.map((order) =>
               order.id === data.orderId ? { ...order, status: data.status } : order
@@ -79,11 +73,22 @@ function MyOrdersPage() {
     return () => client.deactivate();
   }, []);
 
-  // Determine badge color based on status
+  // ✅ Badge styling
   const getStatusBadge = (status) => {
-    if (status === "DELIVERED") return "badge bg-success";
-    if (status === "PLACED") return "badge bg-warning";
-    return "badge bg-secondary";
+    switch (status) {
+      case "DELIVERED":
+        return "badge bg-success";
+      case "PENDING":
+        return "badge bg-warning text-dark";
+      case "PROCESSING":
+        return "badge bg-info text-dark";
+      case "SHIPPED":
+        return "badge bg-primary";
+      case "CANCELLED":
+        return "badge bg-danger";
+      default:
+        return "badge bg-secondary";
+    }
   };
 
   if (orders.length === 0) {
@@ -102,10 +107,7 @@ function MyOrdersPage() {
       <h1 className="text-3xl font-bold mb-6 text-center">📦 My Orders</h1>
 
       {orders.map((order) => (
-        <div
-          key={order.id}
-          className="card p-4 mb-6 shadow rounded-lg border border-gray-300"
-        >
+        <div key={order.id} className="card p-4 mb-6 shadow rounded-lg border border-gray-300">
           <p>
             <strong>Order ID:</strong> #{order.id}
           </p>
@@ -139,15 +141,7 @@ function MyOrdersPage() {
 
           <button
             className="btn btn-sm btn-outline mt-4"
-            onClick={() => {
-              if (order.status === "PLACED") {
-                navigate(`/orders/${order.id}`);
-              } else {
-                alert(
-                  "Order is not placed yet. You can only view details for placed orders."
-                );
-              }
-            }}
+            onClick={() => navigate(`/orders/${order.id}`)}
           >
             View Details
           </button>

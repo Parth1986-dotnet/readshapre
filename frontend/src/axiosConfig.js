@@ -1,39 +1,41 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: 'http://localhost:8081',
-  withCredentials: true, // if needed
+  baseURL: 'http://localhost:8081', // adjust to your backend port
+  withCredentials: true, // ✅ ensures cookies (JWT) are sent with every request
 });
 
-// Attach JWT token
-instance.interceptors.request.use(config => {
-  const token = localStorage.getItem('accessToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-// Handle 401 and refresh token
+// ✅ Response Interceptor to handle 401 + refresh token logic
 instance.interceptors.response.use(
-  res => res,
-  async error => {
+  (response) => response,
+  async (error) => {
     const originalRequest = error.config;
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const refreshRes = await instance.post('/api/auth/refresh-token', {
-          refreshToken: localStorage.getItem('refreshToken'),
-        });
-        const newAccessToken = refreshRes.data.accessToken;
-        localStorage.setItem('accessToken', newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        // Call refresh-token endpoint (backend will set a new cookie)
+        await axios.post(
+          'http://localhost:8081/api/auth/refresh-token',
+          { refreshToken: localStorage.getItem('refreshToken') },
+          { withCredentials: true }
+        );
+
+        // ✅ Retry the original request after refreshing cookie
         return instance(originalRequest);
-      } catch (err) {
-        localStorage.removeItem('accessToken');
+      } catch (refreshError) {
+        console.error('Refresh token failed:', refreshError);
+
+        // Clear refresh token from storage
         localStorage.removeItem('refreshToken');
+
+        // Redirect to login page
         window.location.href = '/login';
-        return Promise.reject(err);
+
+        return Promise.reject(refreshError);
       }
     }
+
     return Promise.reject(error);
   }
 );

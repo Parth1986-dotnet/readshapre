@@ -34,6 +34,7 @@
                     path.equals("/api/users/reset-password") ||
                     path.equals("/api/users/verify-email") ||
                     path.startsWith("/api/public/") ||
+                    path.startsWith("/api/books/") ||
                     path.startsWith("/ws/") ;// <-- exclude websocket handshake
         }
 

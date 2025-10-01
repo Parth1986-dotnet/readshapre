@@ -1,31 +1,34 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import axios from "../axiosConfig";
 
 const AdminRoute = ({ children }) => {
-  //const token = localStorage.getItem('token');
-  const token = localStorage.getItem('accessToken');
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  if (!token) return <Navigate to="/login" />;
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await axios.get("/api/users/profile", { withCredentials: true });
+        setIsAuthenticated(true);
+        setIsAdmin(res.data.role === "ROLE_ADMIN");
+      } catch (err) {
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64));
+    checkAuth();
+  }, []);
 
-    // 👇 Try logging to confirm
-    console.log("Decoded payload:", payload);
+  if (loading) return <div>Loading...</div>; // Or a spinner
 
-    const role = payload.role || (payload.roles && payload.roles[0]);
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAdmin) return <Navigate to="/unauthorized" />;
 
-    if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-      return children;
-    }
-
-    return <Navigate to="/unauthorized" />;
-  } catch (error) {
-    console.error("Token parsing error:", error);
-    return <Navigate to="/login" />;
-  }
+  return children;
 };
 
 export default AdminRoute;

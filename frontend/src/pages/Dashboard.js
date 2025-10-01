@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import axios from '../axiosConfig'; // ✅ use your axiosConfig with withCredentials: true
 
 function Dashboard() {
   const [books, setBooks] = useState([]);
@@ -16,19 +16,13 @@ function Dashboard() {
 
   const fetchBookStats = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('/api/books', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      // ✅ No need to read token or set headers manually
+      const response = await axios.get('/api/books', { withCredentials: true });
       const books = response.data;
       setBooks(books);
 
       setTotalBooks(books.length);
-
-      const inStock = books.filter(book => book.stock > 0);
-      setInStockBooks(inStock.length);
-
+      setInStockBooks(books.filter(book => book.stock > 0).length);
       const outOfStock = books.filter(book => book.stock <= 0);
       setOutOfStockBooks(outOfStock.length);
       setOutOfStockList(outOfStock);
@@ -39,11 +33,7 @@ function Dashboard() {
 
   const fetchTotalEarnings = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('/api/orders/earnings', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Assuming your backend returns a number or string representing the earnings
+      const response = await axios.get('/api/orders/earnings', { withCredentials: true });
       setTotalEarnings(parseFloat(response.data));
     } catch (error) {
       console.error('Failed to fetch total earnings', error);
@@ -73,57 +63,49 @@ function Dashboard() {
           }}
         >
           {/* Total Books */}
-          <div
-            style={{
-              backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              borderLeft: '5px solid #007bff',
-              padding: 20,
-              borderRadius: 6,
-            }}
-          >
+          <div style={{
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '5px solid #007bff',
+            padding: 20,
+            borderRadius: 6,
+          }}>
             <h5 style={{ marginBottom: 10, color: '#007bff' }}>Total Books</h5>
             <p style={{ fontSize: '2rem', fontWeight: '700' }}>{totalBooks}</p>
           </div>
 
           {/* In Stock */}
-          <div
-            style={{
-              backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              borderLeft: '5px solid #28a745',
-              padding: 20,
-              borderRadius: 6,
-            }}
-          >
+          <div style={{
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '5px solid #28a745',
+            padding: 20,
+            borderRadius: 6,
+          }}>
             <h5 style={{ marginBottom: 10, color: '#28a745' }}>In Stock</h5>
             <p style={{ fontSize: '2rem', fontWeight: '700' }}>{inStockBooks}</p>
           </div>
 
           {/* Out of Stock */}
-          <div
-            style={{
-              backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              borderLeft: '5px solid #f0ad4e',
-              padding: 20,
-              borderRadius: 6,
-            }}
-          >
+          <div style={{
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '5px solid #f0ad4e',
+            padding: 20,
+            borderRadius: 6,
+          }}>
             <h5 style={{ marginBottom: 10, color: '#f0ad4e' }}>Out of Stock</h5>
             <p style={{ fontSize: '2rem', fontWeight: '700' }}>{outOfStockBooks}</p>
           </div>
 
-          {/* Total Earnings (from backend) */}
-          <div
-            style={{
-              backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              borderLeft: '5px solid #17a2b8',
-              padding: 20,
-              borderRadius: 6,
-            }}
-          >
+          {/* Total Earnings */}
+          <div style={{
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '5px solid #17a2b8',
+            padding: 20,
+            borderRadius: 6,
+          }}>
             <h5 style={{ marginBottom: 10, color: '#17a2b8' }}>Total Earnings</h5>
             <p style={{ fontSize: '2rem', fontWeight: '700' }}>
               £{totalEarnings.toFixed(2)}
@@ -131,19 +113,13 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Out of stock list */}
         {outOfStockBooks > 0 && (
-          <div
-            className="alert alert-warning"
-            role="alert"
-            style={{ marginTop: 40 }}
-          >
+          <div className="alert alert-warning" role="alert" style={{ marginTop: 40 }}>
             <h4>❌ Out of Stock Books</h4>
             <ul style={{ marginTop: 10 }}>
               {outOfStockList.map(book => (
                 <li key={book.id} style={{ marginBottom: 6 }}>
-                  <strong>{book.title}</strong> —{' '}
-                  <span style={{ fontWeight: 'bold' }}>Unavailable</span>
+                  <strong>{book.title}</strong> — <span style={{ fontWeight: 'bold' }}>Unavailable</span>
                 </li>
               ))}
             </ul>

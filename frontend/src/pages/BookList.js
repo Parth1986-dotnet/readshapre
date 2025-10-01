@@ -1,8 +1,6 @@
-// src/pages/BookList.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-//import api from '../axiosConfig';  // <== Add this import!
-import axiosConfig from '../axiosConfig'; // Ensure this is the correct path to your axios config
+import axiosConfig from '../axiosConfig';
 
 function BookList() {
   const [books, setBooks] = useState([]);
@@ -15,77 +13,56 @@ function BookList() {
 
   const navigate = useNavigate();
 
-  //useEffect(() => {
-    //fetch('http://localhost:8081/api/books')
-      //.then(res => {
-        //if (!res.ok) throw new Error('Failed to fetch books');
-        //return res.json();
-      //})
+  // ✅ Fetch books with cookie automatically included
+  useEffect(() => {
+    const fetchBooks = async () => {
+      setLoading(true);
+      try {
+        const res = await axiosConfig.get('/api/books', {
+          withCredentials: true, // ensures cookie is sent
+        });
+        setBooks(res.data);
+      } catch (err) {
+        console.error('Failed to fetch books:', err);
+        setError('Failed to fetch books');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      //.then(data => setBooks(data))
-      //.catch(err => setError(err.message))
-      //.finally(() => setLoading(false));
-  //}, []);
+    fetchBooks();
+  }, []);
 
-
-    useEffect(() => {
-      const token = localStorage.getItem('accessToken'); // likely key you use
-
-      fetch('http://localhost:8081/api/books', {
-        headers: {
-          'Authorization': 'Bearer ' + token
-        }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch books');
-          return res.json();
-        })
-        .then(data => setBooks(data))
-        .catch(err => setError(err.message))
-        .finally(() => setLoading(false));
-    }, []);
-
-
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this book?')) return;
 
-    fetch(`http://localhost:8081/api/books/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
-      }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Failed to delete');
+    try {
+      await axiosConfig.delete(`/api/books/${id}`, {
+        withCredentials: true,
+      });
       setBooks(prev => prev.filter(book => book.id !== id));
-    })
-    .catch(err => alert(`❌ Error: ${err.message}`));
+    } catch (err) {
+      alert(`❌ Error: ${err.message}`);
+    }
   };
 
   const handleEdit = (id) => {
     navigate(`/edit-book/${id}`);
   };
 
-  // Helper function to check if a string is numeric
+  // Helper function for numeric search
   const isNumeric = (str) => {
-    if (typeof str != "string") return false; // we only process strings
+    if (typeof str !== "string") return false;
     return !isNaN(str) && !isNaN(parseFloat(str));
   };
 
-  // Extended filter logic
   const filteredBooks = books.filter(book => {
     const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
 
-    if (!term) return true; // if search empty, show all
-
-    // Check title or author contains search term
-    const inTitle = book.title.toLowerCase().includes(term);
-    const inAuthor = book.author.toLowerCase().includes(term);
-
-    // Check category contains search term (if exists)
-    const inCategory = book.category ? book.category.toLowerCase().includes(term) : false;
-
-    // Check price match: if term is numeric, compare with price (allow small difference)
+    const inTitle = book.title?.toLowerCase().includes(term);
+    const inAuthor = book.author?.toLowerCase().includes(term);
+    const inCategory = book.category?.toLowerCase().includes(term);
     const priceMatch = isNumeric(term)
       ? Math.abs(book.price - parseFloat(term)) < 0.01
       : false;
@@ -130,17 +107,17 @@ function BookList() {
             </tr>
           </thead>
           <tbody>
-            {currentBooks.map(book => (
+            {currentBooks.length > 0 ? currentBooks.map(book => (
               <tr key={book.id}>
                 <td>{book.title}</td>
                 <td>{book.author}</td>
                 <td>{book.category || '-'}</td>
                 <td>{book.price?.toFixed(2)}</td>
-               <td>
-                 <span className={`badge bg-${book.available === true ? 'success' : 'danger'}`}>
-                   {book.available === true ? 'Available' : 'Unavailable'}
-                 </span>
-               </td>
+                <td>
+                  <span className={`badge bg-${book.available ? 'success' : 'danger'}`}>
+                    {book.available ? 'Available' : 'Unavailable'}
+                  </span>
+                </td>
                 <td>
                   <button
                     className="btn btn-sm btn-outline-primary me-2"
@@ -156,9 +133,7 @@ function BookList() {
                   </button>
                 </td>
               </tr>
-            ))}
-
-            {filteredBooks.length === 0 && (
+            )) : (
               <tr>
                 <td colSpan="6" className="text-center">No books found.</td>
               </tr>

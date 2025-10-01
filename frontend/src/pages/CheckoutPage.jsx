@@ -32,19 +32,36 @@ const CheckoutForm = ({ cartItems, total, clearCart }) => {
       const token = localStorage.getItem("accessToken");
       if (!token) throw new Error("You must be logged in to pay.");
 
-      // Place Order
-      const orderPayload = cartItems.map((item) => ({ bookId: item.id, quantity: item.quantity || 1 }));
-      const orderResponse = await placeOrder(orderPayload);
-      if (!orderResponse?.order?.id) throw new Error("Failed to create order.");
+      // 1️⃣ Place Order
+      const orderPayload = cartItems.map((item) => ({
+        bookId: item.id,
+        quantity: item.quantity || 1,
+      }));
 
-      // Create PaymentIntent
+      const orderResponse = await placeOrder(orderPayload);
+      console.log("📦 Raw orderResponse:", orderResponse);
+
+      // Handle both response shapes
+      const order = orderResponse?.order || orderResponse;
+
+      if (!order?.id || !order?.totalAmount) {
+        throw new Error("Failed to create order.");
+      }
+
+      // 2️⃣ Create PaymentIntent
       const { data } = await axiosInstance.post(
         "/api/payments/intent",
-        { amount: Math.round(orderResponse.order.totalAmount * 100), currency: "GBP", orderId: orderResponse.order.id },
+        {
+          amount: Math.round(order.totalAmount * 100),
+          currency: "GBP",
+          orderId: order.id,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const { clientSecret } = data;
+
+      // 3️⃣ Confirm Payment
       const cardElement = elements.getElement(CardElement);
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
@@ -56,11 +73,16 @@ const CheckoutForm = ({ cartItems, total, clearCart }) => {
         },
       });
 
-      if (error) setMessage(`❌ ${error.message}`);
-      else if (paymentIntent?.status === "succeeded") {
+      if (error) {
+        setMessage(`❌ ${error.message}`);
+      } else if (paymentIntent?.status === "succeeded") {
         setMessage("✅ Payment successful! Your order has been placed.");
         clearCart();
-      } else setMessage("❌ Payment failed. Please try again.");
+        // Optionally redirect to an order confirmation page
+        // navigate("/orders/confirmation");
+      } else {
+        setMessage("❌ Payment failed. Please try again.");
+      }
     } catch (err) {
       console.error(err);
       setMessage(`❌ ${err.message || "Something went wrong."}`);

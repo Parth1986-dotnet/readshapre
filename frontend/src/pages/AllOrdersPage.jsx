@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
-import 'react-toastify/dist/ReactToastify.css';
+import axiosConfig from '../axiosConfig'; // ✅ use your shared axios instance
 
 const STATUS_OPTIONS = ['', 'PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
@@ -11,17 +10,6 @@ const STATUS_COLORS = {
   DELIVERED: '#32CD32',
   CANCELLED: '#FF4500',
 };
-
-// Axios instance
-const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081',
-  headers: { 'Content-Type': 'application/json' },
-});
-axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
 
 function AllOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -43,20 +31,24 @@ function AllOrdersPage() {
         if (userEmail) params.userEmail = userEmail;
         if (status) params.status = status;
 
-        const response = await axiosInstance.get('/api/orders', { params });
-        const data = response.data;
+        const response = await axiosConfig.get('/api/orders', {
+          params,
+          withCredentials: true, // ✅ ensures cookies are sent
+        });
 
+        const data = response.data;
         setOrders(data.content || []);
         setTotalPages(data.totalPages || 1);
         setPage(data.number || pageNumber);
 
+        // Map editable statuses
         const statusMap = {};
-        (data.content || []).forEach((order) => {
+        (data.content || []).forEach(order => {
           statusMap[order.id] = order.status || '';
         });
         setEditableStatus(statusMap);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch orders:', err);
         setError('Failed to fetch orders');
       } finally {
         setLoading(false);
@@ -70,39 +62,37 @@ function AllOrdersPage() {
   }, [fetchOrders, page, filters.userEmail, filters.status]);
 
   const handleStatusChange = (orderId, newStatus) => {
-    setEditableStatus((prev) => ({ ...prev, [orderId]: newStatus }));
+    setEditableStatus(prev => ({ ...prev, [orderId]: newStatus }));
   };
 
   const handleSaveStatus = async (orderId) => {
     const newStatus = editableStatus[orderId];
     if (!newStatus) return;
 
-    setSavingStatus((prev) => ({ ...prev, [orderId]: true }));
+    setSavingStatus(prev => ({ ...prev, [orderId]: true }));
 
     try {
-      await axiosInstance.put(`/api/orders/${orderId}/status`, { status: newStatus });
+      await axiosConfig.put(`/api/orders/${orderId}/status`, { status: newStatus }, {
+        withCredentials: true,
+      });
+
       fetchOrders(page, filters.userEmail.trim(), filters.status);
     } catch (err) {
       alert(`Failed to update status for order ${orderId}: ${err.response?.data || err.message}`);
-      console.error(err);
     } finally {
-      setSavingStatus((prev) => ({ ...prev, [orderId]: false }));
+      setSavingStatus(prev => ({ ...prev, [orderId]: false }));
     }
   };
 
-  const goPrevPage = () => {
-    if (page > 0) setPage(page - 1);
-  };
-  const goNextPage = () => {
-    if (page < totalPages - 1) setPage(page + 1);
-  };
+  const goPrevPage = () => page > 0 && setPage(page - 1);
+  const goNextPage = () => page < totalPages - 1 && setPage(page + 1);
 
   if (loading) return <div>Loading orders...</div>;
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
 
   return (
     <div style={{ padding: 20, maxWidth: 1100, margin: 'auto' }}>
-      <h1 style={{ marginBottom: 20 }}>All Orders</h1>
+      <h1>All Orders</h1>
 
       {/* Filters */}
       <div style={{ marginBottom: '1rem', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -110,13 +100,13 @@ function AllOrdersPage() {
           type="text"
           placeholder="Search by user email"
           value={filters.userEmail}
-          onChange={(e) => setFilters((prev) => ({ ...prev, userEmail: e.target.value }))}
-          style={{ flexGrow: 1, minWidth: 200, padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+          onChange={(e) => setFilters(prev => ({ ...prev, userEmail: e.target.value }))}
+          style={{ flexGrow: 1, minWidth: 200 }}
         />
         <select
           value={filters.status}
-          onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-          style={{ padding: 6, minWidth: 150, borderRadius: 4, border: '1px solid #ccc' }}
+          onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+          style={{ minWidth: 150 }}
         >
           {STATUS_OPTIONS.map((status) => (
             <option key={status} value={status}>
@@ -125,201 +115,85 @@ function AllOrdersPage() {
           ))}
         </select>
         <button
-          onClick={() => {
-            setPage(0);
-            fetchOrders(0, filters.userEmail.trim(), filters.status);
-          }}
-          style={{ padding: '6px 12px', borderRadius: 4, border: 'none', backgroundColor: '#1E90FF', color: '#fff' }}
+          onClick={() => fetchOrders(0, filters.userEmail.trim(), filters.status)}
+          style={{ padding: '6px 12px', backgroundColor: '#1E90FF', color: '#fff', border: 'none', borderRadius: 4 }}
         >
           Search
         </button>
       </div>
 
-      {/* Desktop Table */}
+      {/* Orders Table */}
       <div className="desktop-table">
-        <table
-          border="1"
-          cellPadding="8"
-          cellSpacing="0"
-          style={{ width: '100%', borderCollapse: 'collapse', borderRadius: 8, overflow: 'hidden' }}
-        >
-          <thead style={{ backgroundColor: '#f0f0f0' }}>
+        <table className="table table-bordered table-hover">
+          <thead className="table-light">
             <tr>
               <th>ID</th>
               <th>User Email</th>
               <th>Status</th>
-              <th>Total Amount</th>
+              <th>Total</th>
               <th>Order Date</th>
               <th>Estimated Delivery</th>
               <th>Items</th>
-              <th>Actions</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {orders.length === 0 ? (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center' }}>
-                  No orders found.
-                </td>
-              </tr>
-            ) : (
-              orders.map((order) => {
-                const currentStatus = editableStatus[order.id] || '';
-                const statusChanged = currentStatus !== order.status;
-                return (
-                  <tr key={order.id}>
-                    <td>{order.id}</td>
-                    <td>{order.userEmail}</td>
-                    <td>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          backgroundColor: STATUS_COLORS[order.status] || '#ccc',
-                          color: '#fff',
-                          marginRight: 6,
-                        }}
-                      >
-                        {order.status}
-                      </span>
-                      <select
-                        value={currentStatus}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        style={{ minWidth: 120 }}
-                      >
-                        {STATUS_OPTIONS.map((statusOption) => (
-                          <option key={statusOption} value={statusOption}>
-                            {statusOption || 'Select Status'}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>£{order.totalAmount?.toFixed(2)}</td>
-                    <td>{order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</td>
-                    <td>{order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString() : 'N/A'}</td>
-                    <td>
-                      <ul style={{ margin: 0, paddingLeft: 16 }}>
-                        {(order.items || []).map((item, idx) => (
-                          <li key={`${order.id}-${item.id ?? idx}`}>
-                            {item.bookTitle} (Qty: {item.quantity})
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => handleSaveStatus(order.id)}
-                        disabled={!statusChanged || savingStatus[order.id]}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        {savingStatus[order.id] ? 'Saving...' : 'Save'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+              <tr><td colSpan="8" className="text-center">No orders found</td></tr>
+            ) : orders.map(order => {
+              const currentStatus = editableStatus[order.id] || '';
+              const statusChanged = currentStatus !== order.status;
+
+              return (
+                <tr key={order.id}>
+                  <td>{order.id}</td>
+                  <td>{order.userEmail}</td>
+                  <td>
+                    <span style={{
+                      backgroundColor: STATUS_COLORS[order.status] || '#ccc',
+                      color: '#fff', padding: '2px 6px', borderRadius: 4, marginRight: 6
+                    }}>
+                      {order.status}
+                    </span>
+                    <select
+                      value={currentStatus}
+                      onChange={e => handleStatusChange(order.id, e.target.value)}
+                      style={{ minWidth: 120 }}
+                    >
+                      {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s || 'Select Status'}</option>)}
+                    </select>
+                  </td>
+                  <td>£{order.totalAmount?.toFixed(2)}</td>
+                  <td>{order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</td>
+                  <td>{order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString() : 'N/A'}</td>
+                  <td>
+                    <ul>
+                      {(order.items || []).map((item, i) => (
+                        <li key={i}>{item.bookTitle} (x{item.quantity})</li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td>
+                    <button
+                      disabled={!statusChanged || savingStatus[order.id]}
+                      onClick={() => handleSaveStatus(order.id)}
+                    >
+                      {savingStatus[order.id] ? 'Saving...' : 'Save'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Mobile Cards */}
-      <div className="mobile-cards" style={{ display: 'none' }}>
-        {orders.length === 0 ? (
-          <p>No orders found.</p>
-        ) : (
-          orders.map((order) => {
-            const currentStatus = editableStatus[order.id] || '';
-            const statusChanged = currentStatus !== order.status;
-            return (
-              <div
-                key={order.id}
-                style={{
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  borderRadius: 8,
-                  padding: 16,
-                  marginBottom: 12,
-                  backgroundColor: '#fff',
-                }}
-              >
-                <p><strong>Order ID:</strong> {order.id}</p>
-                <p><strong>User Email:</strong> {order.userEmail}</p>
-                <div>
-                  <strong>Status:</strong>{' '}
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      backgroundColor: STATUS_COLORS[order.status] || '#ccc',
-                      color: '#fff',
-                      marginRight: 6,
-                    }}
-                  >
-                    {order.status}
-                  </span>
-                  <select
-                    value={currentStatus}
-                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                    style={{ minWidth: 120 }}
-                  >
-                    {STATUS_OPTIONS.map((statusOption) => (
-                      <option key={statusOption} value={statusOption}>
-                        {statusOption || 'Select Status'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p><strong>Total:</strong> £{order.totalAmount?.toFixed(2)}</p>
-                <p><strong>Order Date:</strong> {order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</p>
-                <p><strong>Estimated Delivery:</strong> {order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString() : 'N/A'}</p>
-                <div>
-                  <strong>Items:</strong>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    {(order.items || []).map((item, idx) => (
-                      <li key={`${order.id}-${item.id ?? idx}`}>
-                        {item.bookTitle} (Qty: {item.quantity})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <button
-                  onClick={() => handleSaveStatus(order.id)}
-                  disabled={!statusChanged || savingStatus[order.id]}
-                  style={{
-                    padding: '6px 12px',
-                    marginTop: 6,
-                    backgroundColor: '#1E90FF',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 4,
-                  }}
-                >
-                  {savingStatus[order.id] ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            );
-          })
-        )}
-      </div>
-
       {/* Pagination */}
-      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 20 }}>
         <button onClick={goPrevPage} disabled={page === 0}>Previous</button>
         <span>Page {page + 1} of {totalPages}</span>
         <button onClick={goNextPage} disabled={page >= totalPages - 1}>Next</button>
       </div>
-
-      {/* Responsive CSS */}
-      <style>
-        {`
-          @media (max-width: 768px) {
-            .desktop-table { display: none; }
-            .mobile-cards { display: block; }
-          }
-        `}
-      </style>
     </div>
   );
 }
