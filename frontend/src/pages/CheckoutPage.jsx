@@ -1,201 +1,317 @@
 // src/pages/CheckoutPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { useNavigate } from "react-router-dom";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useCart } from "../context/CartContext";
-import axiosInstance from "../axiosConfig";
+import axiosConfig from "../axiosConfig";
 import { placeOrder } from "../context/OrderService";
+import { useCart } from "../context/CartContext";
+import { FaLock, FaCreditCard, FaTruck } from "react-icons/fa";
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-// ------------------- Checkout Form -------------------
-const CheckoutForm = ({ cartItems, total, clearCart }) => {
+const CheckoutForm = () => {
   const stripe = useStripe();
   const elements = useElements();
-  const navigate = useNavigate();
-
-  const [customerInfo, setCustomerInfo] = useState({ customerName: "", address: "", postalCode: "" });
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { cartItems, clearCart } = useCart();
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handlePayment = async () => {
-    if (!stripe || !elements) return;
-    if (cartItems.length === 0) return setMessage("❌ Your cart is empty.");
-    if (!customerInfo.customerName || !customerInfo.address || !customerInfo.postalCode)
-      return setMessage("❌ Please fill in all customer details.");
+  // 🧾 Customer Details
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
-    setIsProcessing(true);
-    setMessage("");
+  // 🚚 Estimated delivery date (+5 days)
+  const [deliveryDate, setDeliveryDate] = useState("");
+
+  useEffect(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 5);
+    const formatted = date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    setDeliveryDate(formatted);
+  }, []);
+
+  const totalAmount = cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    if (!name || !address || !city || !postalCode) {
+      setMessage("⚠️ Please fill in your shipping details before payment.");
+      return;
+    }
 
     try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("You must be logged in to pay.");
+      setLoading(true);
+      setMessage("");
 
-      // 1️⃣ Place Order
-      const orderPayload = cartItems.map((item) => ({
-        bookId: item.id,
-        quantity: item.quantity || 1,
-      }));
+      const orderPayload = {
+        items: cartItems.map((item) => ({
+          bookId: item.id,
+          quantity: item.quantity,
+        })),
+        shippingAddress: `${name}, ${address}, ${city}, ${postalCode}`,
+        estimatedDelivery: deliveryDate,
+      };
 
       const orderResponse = await placeOrder(orderPayload);
-      console.log("📦 Raw orderResponse:", orderResponse);
+      const order = orderResponse.order || orderResponse;
 
-      // Handle both response shapes
-      const order = orderResponse?.order || orderResponse;
-
-      if (!order?.id || !order?.totalAmount) {
-        throw new Error("Failed to create order.");
-      }
-
-      // 2️⃣ Create PaymentIntent
-      const { data } = await axiosInstance.post(
+      const { data: paymentIntent } = await axiosConfig.post(
         "/api/payments/intent",
         {
           amount: Math.round(order.totalAmount * 100),
           currency: "GBP",
           orderId: order.id,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { withCredentials: true }
       );
 
-      const { clientSecret } = data;
-
-      // 3️⃣ Confirm Payment
-      const cardElement = elements.getElement(CardElement);
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-          billing_details: {
-            name: customerInfo.customerName,
-            address: { line1: customerInfo.address, postal_code: customerInfo.postalCode },
+      const { error, paymentIntent: confirmedPayment } =
+        await stripe.confirmCardPayment(paymentIntent.clientSecret, {
+          payment_method: {
+            card: elements.getElement(CardElement),
+            billing_details: { name },
           },
-        },
-      });
+        });
 
       if (error) {
         setMessage(`❌ ${error.message}`);
-      } else if (paymentIntent?.status === "succeeded") {
-        setMessage("✅ Payment successful! Your order has been placed.");
+      } else if (confirmedPayment.status === "succeeded") {
+        setMessage(
+          `✅ Payment successful! Your order will arrive by ${deliveryDate}.`
+        );
         clearCart();
-        // Optionally redirect to an order confirmation page
-        // navigate("/orders/confirmation");
       } else {
         setMessage("❌ Payment failed. Please try again.");
       }
     } catch (err) {
-      console.error(err);
-      setMessage(`❌ ${err.message || "Something went wrong."}`);
+      console.error("Checkout error:", err);
+      setMessage(err.response?.data?.message || err.message);
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="row g-4">
-      {/* Left Panel: Customer Details */}
-      <div className="col-lg-7">
-        <div className="card shadow-sm">
-          <div className="card-body">
-            <h5 className="card-title mb-4">🧾 Customer Details</h5>
-            <div className="d-flex flex-column gap-3">
-              <input
-                type="text"
-                name="customerName"
-                placeholder="Full Name"
-                value={customerInfo.customerName}
-                onChange={(e) => setCustomerInfo({ ...customerInfo, customerName: e.target.value })}
-                className="form-control"
-                required
-              />
-              <input
-                type="text"
-                name="address"
-                placeholder="Address"
-                value={customerInfo.address}
-                onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                className="form-control"
-                required
-              />
-              <input
-                type="text"
-                name="postalCode"
-                placeholder="Postal Code"
-                value={customerInfo.postalCode}
-                onChange={(e) => setCustomerInfo({ ...customerInfo, postalCode: e.target.value })}
-                className="form-control"
-                required
-              />
-              <div className="form-control p-2">
-                <CardElement options={{ hidePostalCode: true }} />
-              </div>
-            </div>
-          </div>
+    <div
+      className="min-vh-100 d-flex align-items-center justify-content-center"
+      style={{
+        background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+        padding: "40px 0",
+      }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          background: "rgba(255, 255, 255, 0.98)",
+          borderRadius: "20px",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+          padding: "35px",
+          width: "450px",
+          maxWidth: "90%",
+        }}
+      >
+        {/* HEADER */}
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <FaCreditCard size={40} color="#2a5298" />
+          <h3 style={{ color: "#2a5298", marginTop: "10px", fontWeight: "600" }}>
+            Checkout
+          </h3>
+          <p style={{ fontSize: "14px", color: "#555" }}>
+            Complete your purchase and get it delivered by{" "}
+            <b>{deliveryDate}</b>.
+          </p>
         </div>
-      </div>
 
-      {/* Right Panel: Cart Summary */}
-      <div className="col-lg-5">
+        {/* SHIPPING INFO */}
+        <h5 style={{ color: "#2a5298", marginBottom: "10px" }}>Shipping Info</h5>
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          style={inputStyle}
+        />
+        <input
+          type="text"
+          placeholder="Address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          required
+          style={inputStyle}
+        />
+        <input
+          type="text"
+          placeholder="City"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          required
+          style={inputStyle}
+        />
+        <input
+          type="text"
+          placeholder="Postal Code"
+          value={postalCode}
+          onChange={(e) => setPostalCode(e.target.value)}
+          required
+          style={inputStyle}
+        />
+
+        {/* PAYMENT */}
+        <h5 style={{ color: "#2a5298", marginTop: "20px" }}>Payment Method</h5>
         <div
-          className="card shadow-sm sticky-top"
-          style={{ top: "20px", maxHeight: "80vh", display: "flex", flexDirection: "column" }}
+          style={{
+            backgroundColor: "#f9f9f9",
+            border: "1px solid #ddd",
+            borderRadius: "10px",
+            padding: "12px 15px",
+            marginBottom: "20px",
+          }}
         >
-          <div className="card-body d-flex flex-column flex-grow-1">
-            <h5 className="card-title mb-3">🛒 Cart Summary</h5>
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#32325d",
+                  "::placeholder": { color: "#aab7c4" },
+                },
+                invalid: { color: "#fa755a" },
+              },
+              hidePostalCode: true,
+            }}
+          />
+        </div>
 
-            {/* Scrollable cart list */}
-            <ul
-              className="list-group list-group-flush mb-3 flex-grow-1 overflow-auto"
-              style={{ maxHeight: "calc(80vh - 120px)" }}
-            >
-              {cartItems.length === 0 ? (
-                <li className="list-group-item text-muted">Your cart is empty.</li>
-              ) : (
-                cartItems.map((item) => (
-                  <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center">
-                    {item.title} (x{item.quantity})
-                    <span>£{(item.price * item.quantity).toFixed(2)}</span>
-                  </li>
-                ))
-              )}
-            </ul>
-
-            {/* Total + Pay Button */}
-            <div className="mt-auto text-end">
-              <h5>Total: £{total.toFixed(2)}</h5>
-              <button
-                className="btn btn-primary btn-lg w-100 mt-3"
-                onClick={handlePayment}
-                disabled={isProcessing || cartItems.length === 0}
-              >
-                {isProcessing ? "Processing..." : `Pay £${total.toFixed(2)}`}
-              </button>
-              {message && (
-                <div className={`mt-2 text-center ${message.startsWith("✅") ? "text-success" : "text-danger"}`}>
-                  {message}
-                </div>
-              )}
-            </div>
+        {/* ORDER SUMMARY */}
+        <div
+          style={{
+            background: "#eef3fb",
+            padding: "15px",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "15px",
+            }}
+          >
+            <span>Subtotal:</span>
+            <span>£{totalAmount.toFixed(2)}</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: "5px",
+              fontSize: "15px",
+            }}
+          >
+            <span>Shipping:</span>
+            <span>Free 🚚</span>
+          </div>
+          <hr />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontWeight: "600",
+              color: "#2a5298",
+              fontSize: "17px",
+            }}
+          >
+            <span>Total:</span>
+            <span>£{totalAmount.toFixed(2)}</span>
           </div>
         </div>
-      </div>
+
+        {/* BUTTON */}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            background:
+              "linear-gradient(90deg, #2a5298 0%, #1e3c72 100%)",
+            color: "#fff",
+            border: "none",
+            borderRadius: "12px",
+            padding: "14px",
+            fontSize: "17px",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => (e.target.style.opacity = 0.85)}
+          onMouseLeave={(e) => (e.target.style.opacity = 1)}
+        >
+          {loading ? "Processing..." : `Pay £${totalAmount.toFixed(2)}`}
+        </button>
+
+        {message && (
+          <p
+            style={{
+              marginTop: "15px",
+              textAlign: "center",
+              color: message.startsWith("✅") ? "green" : "red",
+              fontWeight: "500",
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        {/* FOOTER */}
+        <div
+          style={{
+            marginTop: "20px",
+            textAlign: "center",
+            color: "#666",
+            fontSize: "13px",
+          }}
+        >
+          <FaLock size={12} /> Payments secured by <b>Stripe</b> |{" "}
+          <FaTruck size={12} /> Delivery in 5 days
+        </div>
+      </form>
     </div>
   );
 };
 
-// ------------------- Parent Checkout Page -------------------
-const CheckoutPage = () => {
-  const { cartItems, clearCart } = useCart();
-  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  return (
-    <Elements stripe={stripePromise}>
-      <div className="container py-5">
-        <h1 className="mb-5 text-center">Checkout</h1>
-        <CheckoutForm cartItems={cartItems} total={total} clearCart={clearCart} />
-      </div>
-    </Elements>
-  );
+const inputStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  marginBottom: "10px",
+  border: "1px solid #ccc",
+  borderRadius: "8px",
+  fontSize: "14px",
+  outline: "none",
 };
 
-export default CheckoutPage;
+export default function CheckoutPage() {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm />
+    </Elements>
+  );
+}

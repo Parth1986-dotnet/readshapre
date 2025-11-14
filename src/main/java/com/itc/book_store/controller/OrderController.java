@@ -33,14 +33,15 @@ public class OrderController {
     private final NotificationService notificationService;
     private final OrderNotificationService orderNotificationService;
 
+
     public OrderController(OrderService orderService,
                            UserService userService,
                            NotificationService notificationService,
                            OrderNotificationService orderNotificationService) {
         this.orderService = orderService;
         this.userService = userService;
-        this.notificationService = notificationService;
-        this.orderNotificationService = orderNotificationService;
+       this.notificationService = notificationService;
+       this.orderNotificationService = orderNotificationService;
     }
 
     // 1️⃣ Place Order (USER or ADMIN)
@@ -50,9 +51,9 @@ public class OrderController {
             @RequestBody CreateOrderRequest createOrderRequest,
             Authentication auth) {
 
-        String username = auth.getName();
-        Users user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        String email = auth.getName(); // ✅ The JWT subject is email
+        Users user = userService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         Order placedOrder = orderService.placeOrder(user.getId(), createOrderRequest);
 
@@ -105,8 +106,8 @@ public class OrderController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<OrderResponse>> getMyOrders(Authentication auth) {
-        String username = auth.getName();
-        Users user = userService.findByUsername(username)
+        String email = auth.getName();
+        Users user = userService.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         List<OrderResponse> orders = orderService.getOrdersByUser(user.getEmail());

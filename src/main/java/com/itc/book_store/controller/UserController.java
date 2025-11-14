@@ -25,17 +25,14 @@ public class UserController {
 
     @GetMapping("/profile")
     public ResponseEntity<UserDTO> getUserProfile(Authentication authentication) {
-        // 'authentication' is auto-injected by Spring Security with the logged-in user's details
-        String username = authentication.getName(); // typically the username
+        String email = authentication.getName(); // ✅ this is now the email
 
-        Users user = userService.findByUsername(username)
+        Users user = userService.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Optionally: Hide password before returning user object
-        //user.setPassword(null);
-
         return ResponseEntity.ok(
-                new UserDTO(user.getId(), user.getUsername(), user.getRole()) );
+                new UserDTO(user.getId(), user.getUsername(), user.getRole())
+        );
     }
 
 }

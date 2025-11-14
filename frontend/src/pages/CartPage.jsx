@@ -2,6 +2,9 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
+import axiosInstance from '../axiosConfig';
+
+// ------------------- Cart Page -------------------//
 
 function CartPage() {
   const { cartItems, removeFromCart, clearCart } = useCart();

@@ -47,7 +47,7 @@ public class BookController {
     }
 
     // ✅ Get book by ID (for editing)
-    @PreAuthorize("isAuthenticated()")
+    //@PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
         return bookService.getBookById(id)

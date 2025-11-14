@@ -42,30 +42,32 @@ public class SecurityConfig {
                 }))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public
+
+                        // ===== PUBLIC ROUTES =====
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll() // ✅ allow all book GETs
                         .requestMatchers("/api/auth/**", "/api/users/register", "/error").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/api/books/**").permitAll()
                         .requestMatchers("/api/payments/webhook").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
 
-                        // User profile
+                        // ===== USER ROUTES =====
                         .requestMatchers("/api/users/profile").authenticated()
-
-                        // Orders
-                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")   // ✅ place order
-                        .requestMatchers("/api/orders/my").hasRole("USER")                 // ✅ my orders
-                        .requestMatchers("/api/orders/**").hasRole("ADMIN")                // ✅ admin orders
-
-                        // Admin section
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
+                        .requestMatchers("/api/orders/my").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/intent").hasRole("USER") // ✅ allow checkout
+                        .requestMatchers("/api/payments/**").hasRole("USER") // ✅ allow refund etc.
+                        // ===== ADMIN ROUTES =====
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/orders/earnings").hasRole("ADMIN")
+                        .requestMatchers("/api/orders/**").hasRole("ADMIN")
 
-                        // Everything else
+                        // ===== FALLBACK =====
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
+
 
     @Bean
     public AuthenticationProvider authenticationProvider() {

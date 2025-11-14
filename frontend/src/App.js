@@ -31,10 +31,11 @@ import MyOrdersPage from './pages/MyOrdersPage';
 import OrderDetailsPage from "./pages/OrderDetailsPage";
 import OrderManagement from "./pages/OrderManagement";
 import AllOrdersPage from "./pages/AllOrdersPage"; // Import AllOrdersPage
-
+import { NotificationProvider } from './context/NotificationProvider';
 
 function App() {
   return (
+  <NotificationProvider>
     <CartProvider>
       <Router>
         <Routes>
@@ -64,6 +65,7 @@ function App() {
             <Route path="order-details" element={<OrderDetailsPage />} />
             <Route path="order-management" element={<OrderManagement />} />
             <Route path="/orders" element={<AllOrdersPage />} />
+
           </Route>
 
           {/* Fallback */}
@@ -71,6 +73,7 @@ function App() {
         </Routes>
       </Router>
     </CartProvider>
+    </NotificationProvider>
   );
 }
 

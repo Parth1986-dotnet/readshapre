@@ -2,9 +2,16 @@ package com.itc.book_store.entity;
 
 import com.itc.book_store.Enum.RoleName;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
+
+import java.time.LocalDateTime;
+@Data
 @Entity
+@AllArgsConstructor
+
+
 @Table(name = "users")
 public class Users {
 
@@ -15,6 +22,7 @@ public class Users {
     @Column(unique = true, nullable = false)
     private String username;
 
+    // ✅ Add this
     @Column(unique = true, nullable = false)
     private String email; // ✅ Add this line
 
@@ -43,36 +51,16 @@ public class Users {
 
     // Getters and Setters
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    public String getEmail() {  // ✅ Add this
-        return email;
     }
 
     public void setEmail(String email) {  // ✅ Add this
         this.email = email;
     }
 
-    public String getPassword() {
-        return password;
-    }
-
     public void setPassword(String password) {
         this.password = password;
-    }
-
-    public RoleName getRole() {
-        return role;
     }
 
     public void setRole(RoleName role) {
@@ -81,20 +69,14 @@ public class Users {
 
     // Reset token related fields and forgot password functionality and methods
 
-    public String getResetToken() {
-        return resetToken;
-    }
-
     public void setResetToken(String resetToken) {
         this.resetToken = resetToken;
-    }
-
-    public LocalDateTime getResetTokenExpiry() {
-        return resetTokenExpiry;
     }
 
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
         this.resetTokenExpiry = resetTokenExpiry;
     }
 
+    public void setId(Long userId) {
+    }
 }

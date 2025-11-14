@@ -2,6 +2,7 @@ package com.itc.book_store.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 
@@ -34,6 +35,7 @@ public class JwtUtil {
     @Value("${jwt.public-key-path}")
     private Resource publicKeyResource;
 
+    @Getter
     @Value("${jwt.expiration-ms}")
     private long expirationMs;
 
@@ -64,18 +66,22 @@ public class JwtUtil {
         }
     }
 
-    public String generateToken(String username, String role) {
+    public String generateToken(String email, String role) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);  // single role
+
+        // ✅ Normalize the role (handle both "USER" and "ROLE_USER" safely)
+        String normalizedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+        claims.put("roles", List.of(normalizedRole));
 
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(username)
+                .setSubject(email)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(privateKey, SignatureAlgorithm.RS384)
                 .compact();
     }
+
 
 
     public String generateRefreshToken(String username) {
@@ -97,10 +103,26 @@ public class JwtUtil {
                 .getSubject();
     }
 
-    // ✅ Add this getter
-    public long getExpirationMs() {
-        return expirationMs;
+    public List<String> extractRoles(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(publicKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        Object rolesObj = claims.get("roles");
+
+        if (rolesObj instanceof List<?> rolesRaw) {
+            return rolesRaw.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .toList(); // Java 17+
+        }
+
+        return List.of(); // return empty list if null or malformed
     }
+
+
 }
 
 

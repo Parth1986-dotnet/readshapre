@@ -1,27 +1,26 @@
 // src/routes/PrivateRoute.jsx
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import axiosConfig from "../axiosConfig";
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('accessToken');
+  const [isAuth, setIsAuth] = useState(null);
 
-  if (!token) return <Navigate to="/login" />;
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await axiosConfig.get("/api/users/profile", { withCredentials: true });
+        setIsAuth(true);
+      } catch {
+        setIsAuth(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64));
-
-    const exp = payload.exp * 1000;
-    if (Date.now() > exp) {
-      localStorage.removeItem('accessToken');
-      return <Navigate to="/login" />;
-    }
-
-    return children;
-  } catch (e) {
-    return <Navigate to="/login" />;
-  }
+  if (isAuth === null) return <div>Loading...</div>;
+  if (!isAuth) return <Navigate to="/login" />;
+  return children;
 };
 
 export default PrivateRoute;

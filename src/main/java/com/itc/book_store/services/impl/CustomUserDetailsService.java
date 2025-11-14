@@ -4,8 +4,13 @@ import com.itc.book_store.entity.Users;
 import com.itc.book_store.repository.UserRepository;
 import com.itc.book_store.security.CustomUserDetails;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
+
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -21,4 +26,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         // Return custom user details
         return new CustomUserDetails(user);
     }
+
+
 }

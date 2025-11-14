@@ -62,7 +62,7 @@ const CheckoutForm = () => {
       }
 
       // 2️⃣ Create payment intent
-      const { data: paymentIntent } = await axios.post(
+      const { data: paymentIntent } = await axiosConfig.post(
         "/api/payments/intent",
         {
           amount: Math.round(order.totalAmount * 100),

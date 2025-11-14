@@ -32,11 +32,17 @@ public class AuthController {
 
     /** Utility to build cookie header with SameSite=None */
     private void setJwtCookie(HttpServletResponse response, String token, long maxAgeSeconds) {
+//        String cookieValue = String.format(
+//                "accessToken=%s; Max-Age=%d; Path=/; HttpOnly; SameSite=None; Secure=%s",
+//                token != null ? token : "",
+//                maxAgeSeconds,
+//                false // ❗ set to true in production with HTTPS
+//        );
+
         String cookieValue = String.format(
-                "accessToken=%s; Max-Age=%d; Path=/; HttpOnly; SameSite=None; Secure=%s",
+                "accessToken=%s; Max-Age=%d; Path=/; HttpOnly; SameSite=None; Secure",
                 token != null ? token : "",
-                maxAgeSeconds,
-                false // ❗ set to true in production with HTTPS
+                maxAgeSeconds
         );
         response.setHeader("Set-Cookie", cookieValue);
     }

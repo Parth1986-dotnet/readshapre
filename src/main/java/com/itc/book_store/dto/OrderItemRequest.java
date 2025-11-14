@@ -15,8 +15,8 @@ public class OrderItemRequest {
 
     public OrderItemRequest() {}
 
-    public OrderItemRequest(Long bookId, int quantity) {
-        this.bookId = bookId;
+   public OrderItemRequest(Long bookId, int quantity) {
+       this.bookId = bookId;
         this.quantity = quantity;
     }
 

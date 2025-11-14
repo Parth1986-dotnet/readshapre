@@ -1,14 +1,14 @@
-import AxiosConfig from "../axiosConfig"; // make sure path matches your folder structure
+// ✅ src/context/OrderService.js
+import axiosConfig from "../axiosConfig";
 
-const API_URL = "/api/orders"; // relative to baseURL in AxiosConfig
-
-export const placeOrder = async (orderItems) => {
+export const placeOrder = async (orderPayload) => {
   try {
-    const payload = { items: orderItems };
-    const response = await AxiosConfig.post(API_URL, payload);
+    const response = await axiosConfig.post("/api/orders", orderPayload, {
+      withCredentials: true, // include HttpOnly JWT cookie
+    });
     return response.data;
   } catch (error) {
-    console.error("Error placing order:", error);
+    console.error("Error placing order:", error.response?.data || error.message);
     throw error;
   }
 };

@@ -7,16 +7,18 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.Collection;
 import java.util.Collections;
 
-public class CustomUserDetails implements UserDetails {
-
-    private final Users user;
-
-    public CustomUserDetails(Users user) {
-        this.user = user;
-    }
+public record CustomUserDetails(Users user) implements UserDetails {
 
     public Long getId() {
         return user.getId(); // numeric user id
+    }
+
+    public String getEmail() {
+        return user.getEmail(); // ✅ expose email if needed
+    }
+
+    public String getRole() {
+        return user.getRole().name(); // ✅ helpful for profile response
     }
 
     @Override
@@ -31,7 +33,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getUsername(); // you can keep email here if you want
+        return user.getEmail(); // ✅ IMPORTANT: use email for login
     }
 
     @Override
