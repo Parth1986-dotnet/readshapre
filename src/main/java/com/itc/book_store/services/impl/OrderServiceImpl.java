@@ -1,269 +1,368 @@
-package com.itc.book_store.services.impl;
+    package com.itc.book_store.services.impl;
 
-import com.itc.book_store.Enum.OrderStatus;
-import com.itc.book_store.dto.*;
-import com.itc.book_store.dto.kafka.OrderEvent;
-import com.itc.book_store.dto.kafka.OrderNotification;
-import com.itc.book_store.entity.Book;
-import com.itc.book_store.entity.Order;
-import com.itc.book_store.entity.OrderItem;
-import com.itc.book_store.entity.Users;
-import com.itc.book_store.repository.*;
-import com.itc.book_store.services.OrderService;
-import com.itc.book_store.services.kafka.OrderNotificationService;
-import com.itc.book_store.services.kafka.OrderProducer;
-import jakarta.transaction.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import com.itc.book_store.dto.OrderItemRequest;
+    import com.itc.book_store.Enum.OrderStatus;
+    import com.itc.book_store.dto.*;
+    import com.itc.book_store.dto.kafka.OrderEvent;
+    import com.itc.book_store.dto.kafka.OrderNotification;
+    import com.itc.book_store.entity.Book;
+    import com.itc.book_store.entity.Order;
+    import com.itc.book_store.entity.OrderItem;
+    import com.itc.book_store.entity.Users;
+    import com.itc.book_store.repository.*;
+    import com.itc.book_store.services.EmailService;
+    import com.itc.book_store.services.OrderService;
+    import com.itc.book_store.services.kafka.OrderNotificationService;
+    import com.itc.book_store.services.kafka.OrderProducer;
+    import jakarta.transaction.Transactional;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
+    import org.springframework.data.domain.Page;
+    import org.springframework.data.domain.Pageable;
+    import org.springframework.stereotype.Service;
+    import com.itc.book_store.dto.OrderItemRequest;
 
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
+    import java.math.BigDecimal;
+    import java.time.LocalDateTime;
+    import java.util.*;
+    import java.util.stream.Collectors;
 
-@Service
-@Transactional
-public class OrderServiceImpl implements OrderService {
-
-    private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
-
-    private final OrderRepository orderRepository;
-    private final BookRepository bookRepository;
-    private final UserRepository userRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final OrderProducer orderProducer;
-    private final OrderNotificationService orderNotificationService;
-
-    public OrderServiceImpl(OrderRepository orderRepository,
-                            BookRepository bookRepository,
-                            UserRepository userRepository,
-                            OrderItemRepository orderItemRepository,
-                            OrderProducer orderProducer,
-                            OrderNotificationService orderNotificationService) {
-        this.orderRepository = orderRepository;
-        this.bookRepository = bookRepository;
-        this.userRepository = userRepository;
-        this.orderItemRepository = orderItemRepository;
-        this.orderProducer = orderProducer;
-        this.orderNotificationService = orderNotificationService;
-    }
-
-    @Override
+    @Service
     @Transactional
-    public Order placeOrder(Long userId, CreateOrderRequest request) {
-        if (request.getItems() == null || request.getItems().isEmpty()) {
-            throw new IllegalArgumentException("Order must contain at least one item");
+    public class OrderServiceImpl implements OrderService {
+
+        private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
+
+        private final OrderRepository orderRepository;
+        private final BookRepository bookRepository;
+        private final UserRepository userRepository;
+        private final OrderItemRepository orderItemRepository;
+        private final OrderProducer orderProducer;
+        private final OrderNotificationService orderNotificationService;
+        private final EmailService emailService;
+
+
+        public OrderServiceImpl(OrderRepository orderRepository,
+                                BookRepository bookRepository,
+                                UserRepository userRepository,
+                                OrderItemRepository orderItemRepository,
+                                OrderProducer orderProducer,
+                                OrderNotificationService orderNotificationService,
+                                EmailService emailService) {
+            this.orderRepository = orderRepository;
+            this.bookRepository = bookRepository;
+            this.userRepository = userRepository;
+            this.orderItemRepository = orderItemRepository;
+            this.orderProducer = orderProducer;
+            this.orderNotificationService = orderNotificationService;
+            this.emailService = emailService; // <-- STORE
         }
 
-        Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        @Override
+        @Transactional
+        public Order placeOrder(Long userId, CreateOrderRequest request) {
 
-        // Fetch books and map them
-        List<Long> bookIds = request.getItems().stream().map(OrderItemRequest::getBookId).toList();
-        List<Book> books = bookRepository.findAllById(bookIds);
+            if (request.getItems() == null || request.getItems().isEmpty()) {
+                throw new IllegalArgumentException("Order must contain at least one item");
+            }
 
-        if (books.size() != bookIds.size()) {
-            List<Long> foundIds = books.stream().map(Book::getId).toList();
-            List<Long> missingIds = bookIds.stream().filter(id -> !foundIds.contains(id)).toList();
-            throw new RuntimeException("Books not found with IDs: " + missingIds);
-        }
+            Users user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        Map<Long, Book> bookMap = books.stream().collect(Collectors.toMap(Book::getId, b -> b));
+            // Fetch all books
+            List<Long> bookIds = request.getItems()
+                    .stream().map(OrderItemRequest::getBookId).toList();
 
-        // Create order
-        Order order = new Order();
-        order.setUser(user);
-        order.setOrderDate(LocalDateTime.now());
-        order.setStatus(OrderStatus.PENDING);
+            List<Book> books = bookRepository.findAllById(bookIds);
 
-        List<OrderItem> orderItems = new ArrayList<>();
-        BigDecimal totalAmount = BigDecimal.ZERO;
+            if (books.size() != bookIds.size()) {
+                List<Long> foundIds = books.stream().map(Book::getId).toList();
+                List<Long> missingIds = bookIds.stream()
+                        .filter(id -> !foundIds.contains(id)).toList();
+                throw new RuntimeException("Books not found with IDs: " + missingIds);
+            }
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            Book book = bookMap.get(itemRequest.getBookId());
-            OrderItem item = new OrderItem();
-            item.setBook(book);
-            item.setQuantity(itemRequest.getQuantity());
+            Map<Long, Book> bookMap = books.stream()
+                    .collect(Collectors.toMap(Book::getId, b -> b));
 
-            BigDecimal itemTotal = book.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
-            item.setPrice(itemTotal);
-            item.setOrder(order);
+            // Create order
+            Order order = new Order();
+            order.setUser(user);
+            order.setOrderDate(LocalDateTime.now());
+            order.setStatus(OrderStatus.PENDING);
 
-            totalAmount = totalAmount.add(itemTotal);
-            orderItems.add(item);
-        }
+            List<OrderItem> orderItems = new ArrayList<>();
+            BigDecimal totalAmount = BigDecimal.ZERO;
 
-        order.setOrderItems(orderItems);
-        order.setTotalAmount(totalAmount);
+            // INVENTORY MANAGEMENT STARTS HERE
+            for (OrderItemRequest itemRequest : request.getItems()) {
 
-        Order savedOrder = orderRepository.save(order);
+                Book book = bookMap.get(itemRequest.getBookId());
 
-        // Notify admins about new order
-        String adminMsg = String.format("📦 New order #%d by %s (Total: %s)",
-                savedOrder.getId(), user.getEmail(), savedOrder.getTotalAmount());
-        OrderNotification adminNotif = new OrderNotification(
-                savedOrder.getId(), adminMsg, savedOrder.getStatus().name()
-        );
-        orderNotificationService.notifyAdmins(adminNotif);
+                // CHECK STOCK
+                if (book.getStock() < itemRequest.getQuantity()) {
+                    throw new RuntimeException("Insufficient stock for book: " + book.getTitle());
+                }
 
-        // Notify user about successful placement
-        OrderNotification userNotif = new OrderNotification(
-                savedOrder.getId(),
-                "✅ Your order has been placed successfully!",
-                savedOrder.getStatus().name()
-        );
-        orderNotificationService.notifyUser(user.getEmail(), userNotif);
+                // REDUCE STOCK
+                int updatedStock = book.getStock() - itemRequest.getQuantity();
+                book.setStock(updatedStock);
 
-        // Kafka event for frontend
-        publishOrderEventWithRetry(savedOrder, true);
+                // OUT OF STOCK MARKING
+                if (updatedStock == 0) {
+                    book.setAvailable(false);
+                }
 
-        return savedOrder;
-    }
+                bookRepository.save(book);
 
-    @Override
-    public Optional<Order> getOrderById(Long id) {
-        return orderRepository.findByIdWithUser(id);
-    }
+                // Build order item
+                OrderItem item = new OrderItem();
+                item.setBook(book);
+                item.setQuantity(itemRequest.getQuantity());
+                item.setOrder(order);
 
-    @Override
-    public Optional<Order> getOrderByIdWithUser(Long id) {
-        return orderRepository.findByIdWithUser(id);
-    }
+                BigDecimal itemTotal = book.getPrice()
+                        .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+                item.setPrice(itemTotal);
 
-    @Override
-    public List<OrderResponse> getOrdersByUser(String email) {
-        Users user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        List<Order> orders = orderRepository.findByUser(user);
-        return orders.stream().map(OrderResponse::fromOrder).collect(Collectors.toList());
-    }
+                totalAmount = totalAmount.add(itemTotal);
+                orderItems.add(item);
+            }
 
-    @Override
-    public List<OrderResponse> getAllOrdersResponses() {
-        List<Order> orders = orderRepository.findAll();
-        return orders.stream().map(OrderResponse::fromOrder).collect(Collectors.toList());
-    }
+            order.setOrderItems(orderItems);
+            order.setTotalAmount(totalAmount);
 
-    @Override
-    @Transactional
-    public Order updateOrderStatus(Long orderId, String status) {
-        OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
+            Order savedOrder = orderRepository.save(order);
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
-
-        order.setStatus(newStatus);
-        Order updatedOrder = orderRepository.save(order);
-
-        // Notify only the user about status change
-        String userMsg = String.format("📢 Your order #%d status is now %s",
-                updatedOrder.getId(), updatedOrder.getStatus().name());
-
-        OrderNotification userNotif = new OrderNotification(
-                updatedOrder.getId(),
-                userMsg,
-                updatedOrder.getStatus().name()
-        );
-
-        orderNotificationService.notifyUser(updatedOrder.getUser().getEmail(), userNotif);
-
-        // Admins are not notified here, they see updates in the dashboard
-
-        // Kafka event for frontend
-        publishOrderEventWithRetry(updatedOrder, false);
-
-        return updatedOrder;
-    }
-
-    @Override
-    public Page<Order> getOrders(Pageable pageable, String status, String userEmail) {
-        OrderStatus orderStatus = null;
-        if (status != null && !status.isEmpty()) {
-            orderStatus = OrderStatus.valueOf(status.toUpperCase());
-        }
-
-        boolean hasEmail = userEmail != null && !userEmail.isEmpty();
-
-        if (orderStatus != null && hasEmail) {
-            return orderRepository.findByStatusAndUser_Email(orderStatus, userEmail, pageable);
-        } else if (orderStatus != null) {
-            return orderRepository.findByStatus(orderStatus, pageable);
-        } else if (hasEmail) {
-            return orderRepository.findByUser_Email(userEmail, pageable);
-        } else {
-            return orderRepository.findAll(pageable);
-        }
-    }
-
-    @Override
-    public Page<OrderResponse> getOrdersPaginatedFiltered(String userEmail, String status, Pageable pageable) {
-        OrderStatus orderStatus = null;
-        if (status != null && !status.trim().isEmpty()) {
-            orderStatus = OrderStatus.valueOf(status.toUpperCase());
-        }
-
-        boolean hasEmail = userEmail != null && !userEmail.trim().isEmpty();
-
-        Page<Order> ordersPage;
-        if (hasEmail && orderStatus != null) {
-            ordersPage = orderRepository.findByUser_EmailContainingIgnoreCaseAndStatus(userEmail, orderStatus, pageable);
-        } else if (hasEmail) {
-            ordersPage = orderRepository.findByUser_EmailContainingIgnoreCase(userEmail, pageable);
-        } else if (orderStatus != null) {
-            ordersPage = orderRepository.findByStatus(orderStatus, pageable);
-        } else {
-            ordersPage = orderRepository.findAll(pageable);
-        }
-
-        return ordersPage.map(OrderResponse::fromOrder);
-    }
-
-    @Override
-    public BigDecimal getTotalEarnings() {
-        return orderItemRepository.getTotalEarnings();
-    }
-
-    @Override
-    public Order requireOwnedOrder(Long orderId, Long userId) {
-        return orderRepository.findById(orderId)
-                .filter(order -> order.getUser().getId().equals(userId))
-                .orElseThrow(() -> new RuntimeException("Invalid order ID or not owned by user"));
-    }
-
-    // ------------------- Kafka helper -------------------
-    private void publishOrderEventWithRetry(Order order, boolean isNewOrder) {
-        int maxAttempts = 3;
-        int attempt = 0;
-        boolean sent = false;
-
-        while (!sent && attempt < maxAttempts) {
+            // EMAIL, WEBSOCKET, KAFKA, ADMIN NOTIFY (unchanged)
             try {
-                attempt++;
-                if (isNewOrder) {
-                    orderProducer.sendOrderEvent(order);
-                } else {
-                    orderProducer.sendOrderStatusUpdate(order);
-                }
-                sent = true;
-                logger.info("Kafka event sent successfully for orderId={} (isNew={})", order.getId(), isNewOrder);
+                String html = buildOrderConfirmationEmail(savedOrder);
+                emailService.sendOrderConfirmation(
+                        user.getEmail(),
+                        "Your Order #" + savedOrder.getId() + " Confirmation",
+                        html
+                );
             } catch (Exception e) {
-                logger.warn("Kafka publish attempt {} failed for orderId={}: {}", attempt, order.getId(), e.getMessage());
-                if (attempt == maxAttempts) {
-                    logger.error("All Kafka retries failed for orderId={}. Saving for fallback.", order.getId());
-                    saveFailedKafkaEvent(order);
-                }
-                try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                logger.error("Failed to send email: {}", e.getMessage());
+            }
+
+            OrderNotification adminNotif = new OrderNotification(
+                    savedOrder.getId(),
+                    "📦 New order placed (Total: " + savedOrder.getTotalAmount() + ")",
+                    savedOrder.getStatus().name()
+            );
+            orderNotificationService.notifyAdmins(adminNotif);
+
+            OrderNotification userNotif = new OrderNotification(
+                    savedOrder.getId(),
+                    "✅ Your order has been placed successfully!",
+                    savedOrder.getStatus().name()
+            );
+            orderNotificationService.notifyUser(user.getEmail(), userNotif);
+
+            // Kafka event
+            publishOrderEventWithRetry(savedOrder, true);
+
+            return savedOrder;
+        }
+
+
+        @Override
+        public Optional<Order> getOrderById(Long id) {
+            return orderRepository.findByIdWithUser(id);
+        }
+
+        @Override
+        public Optional<Order> getOrderByIdWithUser(Long id) {
+            return orderRepository.findByIdWithUser(id);
+        }
+
+        @Override
+        public List<OrderResponse> getOrdersByUser(String email) {
+            Users user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+            List<Order> orders = orderRepository.findByUser(user);
+            return orders.stream().map(OrderResponse::fromOrder).collect(Collectors.toList());
+        }
+
+        @Override
+        public List<OrderResponse> getAllOrdersResponses() {
+            List<Order> orders = orderRepository.findAll();
+            return orders.stream().map(OrderResponse::fromOrder).collect(Collectors.toList());
+        }
+
+        @Override
+        @Transactional
+        public Order updateOrderStatus(Long orderId, String status) {
+            OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
+
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
+
+            order.setStatus(newStatus);
+            Order updatedOrder = orderRepository.save(order);
+
+            // ---------------- EMAIL FOR STATUS CHANGE -------------------
+            try {
+                String html = """
+            <html>
+              <body style='font-family: Arial; padding:20px;'>
+                <h2>🔔 Order Status Update</h2>
+                <p>Your order <b>#%d</b> is now <b>%s</b>.</p>
+              </body>
+            </html>
+            """.formatted(updatedOrder.getId(), updatedOrder.getStatus());
+
+                emailService.sendOrderStatusUpdate(
+                        updatedOrder.getUser().getEmail(),
+                        "Order #" + updatedOrder.getId() + " Status: " + updatedOrder.getStatus(),
+                        html
+                );
+
+                logger.info("Status update email sent to {}", updatedOrder.getUser().getEmail());
+            } catch (Exception e) {
+                logger.error("Failed to send status email for orderId={}: {}", updatedOrder.getId(), e.getMessage());
+            }
+
+            // Notify only the user about status change
+            String userMsg = String.format("📢 Your order #%d status is now %s",
+                    updatedOrder.getId(), updatedOrder.getStatus().name());
+
+            OrderNotification userNotif = new OrderNotification(
+                    updatedOrder.getId(),
+                    userMsg,
+                    updatedOrder.getStatus().name()
+            );
+
+            orderNotificationService.notifyUser(updatedOrder.getUser().getEmail(), userNotif);
+
+            // Admins are not notified here, they see updates in the dashboard
+
+            // Kafka event for frontend
+            publishOrderEventWithRetry(updatedOrder, false);
+
+            return updatedOrder;
+        }
+
+        @Override
+        public Page<Order> getOrders(Pageable pageable, String status, String userEmail) {
+            OrderStatus orderStatus = null;
+            if (status != null && !status.isEmpty()) {
+                orderStatus = OrderStatus.valueOf(status.toUpperCase());
+            }
+
+            boolean hasEmail = userEmail != null && !userEmail.isEmpty();
+
+            if (orderStatus != null && hasEmail) {
+                return orderRepository.findByStatusAndUser_Email(orderStatus, userEmail, pageable);
+            } else if (orderStatus != null) {
+                return orderRepository.findByStatus(orderStatus, pageable);
+            } else if (hasEmail) {
+                return orderRepository.findByUser_Email(userEmail, pageable);
+            } else {
+                return orderRepository.findAll(pageable);
             }
         }
-    }
 
-    private void saveFailedKafkaEvent(Order order) {
-        // TODO: Persist in DB/Redis for retry
-        logger.info("Saved orderId={} for retry later", order.getId());
+        @Override
+        public Page<OrderResponse> getOrdersPaginatedFiltered(String userEmail, String status, Pageable pageable) {
+            OrderStatus orderStatus = null;
+            if (status != null && !status.trim().isEmpty()) {
+                orderStatus = OrderStatus.valueOf(status.toUpperCase());
+            }
+
+            boolean hasEmail = userEmail != null && !userEmail.trim().isEmpty();
+
+            Page<Order> ordersPage;
+            if (hasEmail && orderStatus != null) {
+                ordersPage = orderRepository.findByUser_EmailContainingIgnoreCaseAndStatus(userEmail, orderStatus, pageable);
+            } else if (hasEmail) {
+                ordersPage = orderRepository.findByUser_EmailContainingIgnoreCase(userEmail, pageable);
+            } else if (orderStatus != null) {
+                ordersPage = orderRepository.findByStatus(orderStatus, pageable);
+            } else {
+                ordersPage = orderRepository.findAll(pageable);
+            }
+
+            return ordersPage.map(OrderResponse::fromOrder);
+        }
+
+        @Override
+        public BigDecimal getTotalEarnings() {
+            return orderItemRepository.getTotalEarnings();
+        }
+
+        @Override
+        public Order requireOwnedOrder(Long orderId, Long userId) {
+            return orderRepository.findById(orderId)
+                    .filter(order -> order.getUser().getId().equals(userId))
+                    .orElseThrow(() -> new RuntimeException("Invalid order ID or not owned by user"));
+        }
+
+        // ------------------- Kafka helper -------------------
+        private void publishOrderEventWithRetry(Order order, boolean isNewOrder) {
+            int maxAttempts = 3;
+            int attempt = 0;
+            boolean sent = false;
+
+            while (!sent && attempt < maxAttempts) {
+                try {
+                    attempt++;
+                    if (isNewOrder) {
+                        orderProducer.sendOrderEvent(order);
+                    } else {
+                        orderProducer.sendOrderStatusUpdate(order);
+                    }
+                    sent = true;
+                    logger.info("Kafka event sent successfully for orderId={} (isNew={})", order.getId(), isNewOrder);
+                } catch (Exception e) {
+                    logger.warn("Kafka publish attempt {} failed for orderId={}: {}", attempt, order.getId(), e.getMessage());
+                    if (attempt == maxAttempts) {
+                        logger.error("All Kafka retries failed for orderId={}. Saving for fallback.", order.getId());
+                        saveFailedKafkaEvent(order);
+                    }
+                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                }
+            }
+        }
+
+        private void saveFailedKafkaEvent(Order order) {
+            // TODO: Persist in DB/Redis for retry
+            logger.info("Saved orderId={} for retry later", order.getId());
+        }
+
+
+        private String loadTemplate(String filePath) {
+            try {
+                return new String(
+                        Objects.requireNonNull(
+                                getClass().getClassLoader().getResourceAsStream(filePath)
+                        ).readAllBytes()
+                );
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load email template: " + filePath);
+            }
+        }
+
+        private String buildOrderConfirmationEmail(Order order) {
+
+            String template = loadTemplate("templates/order-confirmation.html");
+
+            String username = order.getUser().getUsername();
+            if (username == null || username.isBlank()) {
+                username = order.getUser().getEmail(); // fallback
+            }
+
+            return template
+                    .replace("{{username}}", username)
+                    .replace("{{orderId}}", String.valueOf(order.getId()))
+                    .replace("{{total}}", String.valueOf(order.getTotalAmount()))
+                    .replace("{{trackingLink}}", "http://localhost:3000/orders/" + order.getId());
+        }
+
+        @Override
+        public List<Book> findByStock(int stock) {
+            return bookRepository.findByStock(stock);
+        }
+
     }
-}

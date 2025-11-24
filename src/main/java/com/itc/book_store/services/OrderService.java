@@ -2,6 +2,7 @@ package com.itc.book_store.services;
 
 import com.itc.book_store.dto.CreateOrderRequest;
 import com.itc.book_store.dto.OrderResponse;
+import com.itc.book_store.entity.Book;
 import com.itc.book_store.entity.Order;
 import com.itc.book_store.entity.Users;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,8 @@ public interface OrderService {
     List<OrderResponse> getOrdersByUser(String email); // ✅ Use this in controller
 
     List<OrderResponse> getAllOrdersResponses();
+
+    List<Book> findByStock(int stock);
 
 
     Order updateOrderStatus(Long orderId, String status);

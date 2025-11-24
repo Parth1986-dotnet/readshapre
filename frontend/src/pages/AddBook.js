@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axiosInstance from "../axiosConfig";
 
 function AddBook() {
   const navigate = useNavigate();
@@ -86,24 +87,19 @@ function AddBook() {
     if (image) formData.append("image", image);
 
     setSubmitting(true);
-    try {
-      const token = localStorage.getItem('accessToken');
 
-      const res = await fetch("http://localhost:8081/api/books", {
-        method: "POST",
-        body: formData,
+    try {
+      // ✅ axiosInstance automatically sends HttpOnly JWT cookie
+      const response = await axiosInstance.post("/api/books", formData, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
+        withCredentials: true,
       });
 
-      if (!res.ok) throw new Error("Upload failed");
-
-      await res.json();
       alert("✅ Book uploaded successfully!");
-      setTimeout(() => {
-        navigate("/list");
-      }, 500);
+      navigate("/list");
+
     } catch (err) {
       console.error(err);
       alert("❌ Failed to upload book. Check console for details.");
@@ -111,6 +107,7 @@ function AddBook() {
       setSubmitting(false);
     }
   };
+
 
   return (
     <div className="container mt-4">

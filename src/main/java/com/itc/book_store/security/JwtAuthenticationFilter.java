@@ -34,6 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getServletPath();
+        String method = request.getMethod();
+
+        boolean isPublicBookGet =
+                path.startsWith("/api/books") &&
+                        method.equals("GET");
+
         return path.equals("/api/auth/login") ||
                 path.equals("/api/auth/refresh-token") ||
                 path.equals("/api/auth/logout") ||
@@ -41,9 +47,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 path.equals("/api/users/reset-password") ||
                 path.equals("/api/users/verify-email") ||
                 path.startsWith("/api/public/") ||
-                path.startsWith("/api/books/") ||
-                path.startsWith("/ws/"); // exclude websocket handshake
+                isPublicBookGet ||          // ✔ only GET book routes are public
+                path.startsWith("/ws/");
     }
+
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

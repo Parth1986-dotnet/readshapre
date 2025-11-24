@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -30,7 +31,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
                     config.setAllowedOrigins(List.of("http://localhost:3000"));
@@ -56,10 +57,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/orders/my").hasRole("USER")
                         .requestMatchers(HttpMethod.POST, "/api/payments/intent").hasRole("USER") // ✅ allow checkout
                         .requestMatchers("/api/payments/**").hasRole("USER") // ✅ allow refund etc.
+
                         // ===== ADMIN ROUTES =====
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/orders/earnings").hasRole("ADMIN")
-                        .requestMatchers("/api/orders/**").hasRole("ADMIN")
+                            .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/api/orders/earnings").hasRole("ADMIN")
+                            .requestMatchers("/api/orders/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.POST, "/api/books/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.GET, "/api/books/out-of-stock").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.GET, "/api/books/low-stock").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/books/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/books/**").hasRole("ADMIN")
+
 
                         // ===== FALLBACK =====
                         .anyRequest().authenticated()

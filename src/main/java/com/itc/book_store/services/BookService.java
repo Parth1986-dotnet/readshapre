@@ -38,4 +38,11 @@ public interface BookService {
 
     Map<String, Integer> getBookStats();
 
+    // 👉 Only declare the method to get out-of-stock books
+    List<Book> getOutOfStockBooks();
+
+    List<Book> getBooksWithLowStock();
+
+    // 🔥 ADD THIS — FIXES @Override ERROR
+    void reduceStock(Long bookId, int quantity);
 }

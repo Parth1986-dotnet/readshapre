@@ -6,6 +6,7 @@ import com.itc.book_store.dto.TokenRefreshRequest;
 import com.itc.book_store.entity.Users;
 import com.itc.book_store.repository.UserRepository;
 import com.itc.book_store.security.JwtUtil;
+import com.itc.book_store.services.EmailService;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,6 +28,10 @@ public class AuthController {
     private UserRepository userRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private EmailService emailService;
+
     @Autowired
     private JwtUtil jwtUtil;
 
@@ -43,6 +48,7 @@ public class AuthController {
                 "accessToken=%s; Max-Age=%d; Path=/; HttpOnly; SameSite=None; Secure",
                 token != null ? token : "",
                 maxAgeSeconds
+
         );
         response.setHeader("Set-Cookie", cookieValue);
     }
@@ -104,18 +110,55 @@ public class AuthController {
 
         Optional<Users> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
+            // For security — always send OK even if email doesn't exist
             return ResponseEntity.ok("Reset link sent if email exists");
         }
 
-        String token = UUID.randomUUID().toString();
         Users user = userOpt.get();
+        String token = UUID.randomUUID().toString();
+
         user.setResetToken(token);
         user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
 
         String resetLink = "http://localhost:3000/reset-password?token=" + token;
-        System.out.println("Password reset link: " + resetLink);
+
+        // 🚀 VERY IMPORTANT — Send Email
+        emailService.sendPasswordResetEmail(email, resetLink);
 
         return ResponseEntity.ok("Reset link sent if email exists");
     }
+
+
+
+    // ===========================================================
+    // 🔐 RESET PASSWORD
+    // ===========================================================
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+
+        Optional<Users> userOpt = userRepository.findByResetToken(token);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(400).body("Invalid token");
+        }
+
+        Users user = userOpt.get();
+
+        if (user.getResetTokenExpiry() == null ||
+                user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            return ResponseEntity.status(400).body("Token expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Password updated successfully");
+    }
+
+
+
 }

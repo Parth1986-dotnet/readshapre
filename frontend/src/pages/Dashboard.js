@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../axiosConfig'; // ✅ use your axiosConfig with withCredentials: true
+import SockJS from "sockjs-client";
+import { Client } from "@stomp/stompjs";
 
 function Dashboard() {
   const [books, setBooks] = useState([]);
@@ -12,7 +14,36 @@ function Dashboard() {
   useEffect(() => {
     fetchBookStats();
     fetchTotalEarnings();
+    setupWebSocket();   // 🔥 real-time updates
   }, []);
+
+const setupWebSocket = () => {
+  const socket = new SockJS("http://localhost:8080/ws");
+  const client = new Client({
+    webSocketFactory: () => socket,
+    reconnectDelay: 5000,
+  });
+
+  client.onConnect = () => {
+    client.subscribe("/topic/stock-updates", (message) => {
+      const event = JSON.parse(message.body);
+      updateStockLive(event);
+    });
+  };
+
+  client.activate();
+};
+
+const updateStockLive = (event) => {
+  setBooks((prevBooks) =>
+    prevBooks.map((book) =>
+      book.id === event.bookId ? { ...book, stock: event.stock } : book
+    )
+  );
+
+  fetchBookStats(); // refresh stats
+};
+
 
   const fetchBookStats = async () => {
     try {

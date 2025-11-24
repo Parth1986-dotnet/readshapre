@@ -82,9 +82,8 @@ function EditBook() {
 
     try {
       await axiosConfig.put(`/api/books/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        withCredentials: true,   // 🔥 REQUIRED
+        headers: { "Content-Type": "multipart/form-data" }
       });
       alert('✅ Book updated successfully!');
       navigate('/list');

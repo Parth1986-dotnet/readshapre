@@ -1,20 +1,20 @@
 package com.itc.book_store.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-
-import jakarta.validation.constraints.NotEmpty;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class CreateOrderRequest {
 
     @NotEmpty(message = "Order must have at least one item.")
@@ -24,5 +24,6 @@ public class CreateOrderRequest {
     private String shippingAddress;
 
     @NotNull(message = "Estimated delivery date is required.")
-    private String estimatedDelivery;
+    @JsonFormat(pattern = "EEE, dd MMM yyyy", locale = "en")   // ✅ FIXED
+    private LocalDate estimatedDelivery;
 }

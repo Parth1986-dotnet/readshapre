@@ -5,9 +5,11 @@
     import com.itc.book_store.repository.BookRepository;
     import com.itc.book_store.services.BookService;
     import com.itc.book_store.services.FileService;
+    import com.itc.book_store.services.kafka.StockEventProducer;
     import lombok.RequiredArgsConstructor;
     import org.springframework.stereotype.Service;
     import org.springframework.web.multipart.MultipartFile;
+    import com.itc.book_store.dto.kafka.StockEvent;
 
     import java.math.BigDecimal;
     import java.time.LocalDate;
@@ -26,6 +28,8 @@
         private final BookRepository bookRepository;
 
         private final FileService fileService;
+
+        private final StockEventProducer stockEventProducer;
 
         @Override
         public Book createBook(String title,
@@ -121,5 +125,32 @@
             return stats;
         }
 
+        @Override
+        public List<Book> getOutOfStockBooks() {
+            return bookRepository.findByStock(0);
+        }
 
+        @Override
+        public List<Book> getBooksWithLowStock() {
+            return bookRepository.findByStockLessThanEqual(5);
+        }
+
+        // 🔥🔥🔥 NEW METHOD — reduce stock on order placement
+        @Override
+        public void reduceStock(Long bookId, int quantity) {
+            Book book = bookRepository.findById(bookId)
+                    .orElseThrow(() -> new RuntimeException("Book not found"));
+
+            // Ensure stock does not go negative
+            if (book.getStock() < quantity) {
+                throw new RuntimeException("Not enough stock available for: " + book.getTitle());
+            }
+
+            book.setStock(book.getStock() - quantity);
+            Book saved = bookRepository.save(book);
+
+            // 🔥 Send real-time inventory event to Kafka
+            stockEventProducer.sendStockEvent(saved);
+        }
     }
+

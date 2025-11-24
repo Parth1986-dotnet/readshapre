@@ -6,11 +6,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
 import com.itc.book_store.Enum.OrderStatus;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.Data;
+import lombok.Builder;
 
 @Entity
 @Table(name = "orders")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Order {
 
     @Id
@@ -25,12 +34,6 @@ public class Order {
 
     private LocalDate estimatedDelivery;
 
-//    @Column(name = "created_at", nullable = false, updatable = false)
-//    private LocalDateTime createdAt;
-
-//    @Column(name = "updated_at")
-//    private LocalDateTime updatedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private Users user;
@@ -41,53 +44,7 @@ public class Order {
 
     private BigDecimal totalAmount;
 
-    // ===== Constructors =====
-    public Order() {}
-
-    public Order(LocalDateTime orderDate, OrderStatus status, Users user, List<OrderItem> orderItems, BigDecimal totalAmount) {
-        this.orderDate = orderDate;
-        this.status = status;
-        this.user = user;
-        this.orderItems = orderItems;
-        this.totalAmount = totalAmount;
-    }
-
-    // ===== Getters & Setters =====
-    public Long getId() {
-        return id;
-    }
-
-    public LocalDateTime getOrderDate() {
-        return orderDate;
-    }
-
-    public void setOrderDate(LocalDateTime orderDate) {
-        this.orderDate = orderDate;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
-    }
-
-    public Users getUser() {
-        return user;
-    }
-
-    public void setUser(Users user) {
-        this.user = user;
-    }
-
-    public List<OrderItem> getOrderItems() {
-        return orderItems;
-    }
-
-    public void setOrderItems(List<OrderItem> orderItems) {
-        this.orderItems = orderItems;
-    }
+    // ===== Helper Methods =====
 
     public void addItem(OrderItem item) {
         orderItems.add(item);
@@ -98,40 +55,6 @@ public class Order {
         orderItems.remove(item);
         item.setOrder(null);
     }
-
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
-    }
-
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
-    }
-
-    public LocalDate getEstimatedDelivery() {
-        return estimatedDelivery;
-    }
-
-    public void setEstimatedDelivery(LocalDate estimatedDelivery) {
-        this.estimatedDelivery = estimatedDelivery;
-    }
-
-//    @PrePersist
-//    protected void onCreate() {
-//        createdAt = LocalDateTime.now();
-//    }
-//
-//    @PreUpdate
-//    protected void onUpdate() {
-//        updatedAt = LocalDateTime.now();
-//    }
-//
-//    public LocalDateTime getCreatedAt() {
-//        return createdAt;
-//    }
-//
-//    public LocalDateTime getUpdatedAt() {
-//        return updatedAt;
-//    }
 
     public BigDecimal getGrandTotal() {
         return totalAmount != null ? totalAmount : BigDecimal.ZERO;

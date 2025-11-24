@@ -70,23 +70,26 @@ public class BookController {
             @RequestParam("stock") int stock,
             @RequestParam("publicationDate") String publicationDateStr,
             @RequestParam("available") boolean available,
-            @RequestParam("image") MultipartFile imageFile,
 
-            // ✅ ADD THIS
+            // 🟢 FIX: Image is optional now
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+
             @RequestParam(value = "previewText", required = false) String previewText
     ) {
+
         BigDecimal priceDecimal = BigDecimal.valueOf(price);
 
         Book saved = bookService.createBook(
                 title, author, publisher, isbn, category, description,
                 priceDecimal, stock, publicationDateStr, available, imageFile, previewText
         );
+
         return ResponseEntity.ok(saved);
     }
 
-
     // Update book by ID with optional image file
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<Book> updateBook(
             @PathVariable Long id,
@@ -150,7 +153,18 @@ public class BookController {
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Book not found"));
     }
 
+    @GetMapping("/out-of-stock")
+    public ResponseEntity<List<Book>> getOutOfStockBooks() {
+        List<Book> outOfStockBooks = bookService.getOutOfStockBooks();
+        if (outOfStockBooks.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(outOfStockBooks);
+    }
 
-
+    @GetMapping("/low-stock")
+    public List<Book> getLowStockBooks() {
+        return bookService.getBooksWithLowStock();
+    }
 
 }

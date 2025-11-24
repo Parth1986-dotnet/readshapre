@@ -32,6 +32,7 @@ import OrderDetailsPage from "./pages/OrderDetailsPage";
 import OrderManagement from "./pages/OrderManagement";
 import AllOrdersPage from "./pages/AllOrdersPage"; // Import AllOrdersPage
 import { NotificationProvider } from './context/NotificationProvider';
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
           <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* Protected Layout with nested routes */}

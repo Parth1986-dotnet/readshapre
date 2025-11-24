@@ -8,6 +8,11 @@ import com.itc.book_store.services.OrderService;
 import com.itc.book_store.services.NotificationService;
 import com.itc.book_store.services.impl.UserService;
 import com.itc.book_store.services.kafka.OrderNotificationService;
+import com.itc.book_store.repository.BookRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+import com.itc.book_store.entity.Book;
+import org.springframework.web.bind.annotation.GetMapping;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,7 +37,6 @@ public class OrderController {
     private final UserService userService;
     private final NotificationService notificationService;
     private final OrderNotificationService orderNotificationService;
-
 
     public OrderController(OrderService orderService,
                            UserService userService,
@@ -135,4 +139,5 @@ public class OrderController {
         BigDecimal totalEarnings = orderService.getTotalEarnings();
         return ResponseEntity.ok(totalEarnings);
     }
+
 }

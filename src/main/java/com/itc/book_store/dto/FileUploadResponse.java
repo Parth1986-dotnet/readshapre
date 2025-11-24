@@ -8,5 +8,4 @@ public class FileUploadResponse {
     private String fileUrl;
     private LocalDateTime uploadedAt;
 
-
 }
