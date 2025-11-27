@@ -1,4 +1,10 @@
+version: '3.9'
+
 services:
+
+  # ==========================
+  # ZOOKEEPER
+  # ==========================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -7,7 +13,12 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - backend
 
+  # ==========================
+  # KAFKA
+  # ==========================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -21,3 +32,30 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - backend
+
+  # ==========================
+  # POSTGRESQL (YOUR DB MOVED TO DOCKER)
+  # ==========================
+  postgres:
+    image: postgres:17
+    container_name: postgres-bookshop
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ShivaniDeviyani@2025
+      POSTGRES_DB: bookshop_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backup:/backup   # Your backup goes here
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  postgres_data:

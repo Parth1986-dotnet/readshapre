@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BookCard from "../components/BookCard";
 import { useCart } from "../context/CartContext";
-import BookMagnifier from "../components/BookMagnifier"; // ✅ magnifier component
+import BookMagnifier from "../components/BookMagnifier";
 
 function AllBooksPage() {
   const [books, setBooks] = useState([]);
@@ -11,16 +11,15 @@ function AllBooksPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const booksPerPage = 9;
+  const booksPerPage = 12;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [previewBook, setPreviewBook] = useState(null);
 
   const { addToCart } = useCart();
 
-  // Close preview on Escape
+  // Escape closes modal
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setPreviewBook(null);
     document.addEventListener("keydown", onKey);
@@ -55,22 +54,27 @@ function AllBooksPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Categories
   const categories = useMemo(
     () => [...new Set(books.map((b) => b.category).filter(Boolean))],
     [books]
   );
 
+  // Search + Filter
   const filteredBooks = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return books.filter((book) => {
       const matchesSearch = [book.title, book.author, book.category, book.price?.toString()].some(
         (f) => f?.toString().toLowerCase().includes(term)
       );
-      const matchesCategory = selectedCategory ? book.category === selectedCategory : true;
+      const matchesCategory = selectedCategory
+        ? book.category === selectedCategory
+        : true;
       return matchesSearch && matchesCategory;
     });
   }, [books, searchTerm, selectedCategory]);
 
+  // Sorting
   const sortedBooks = useMemo(() => {
     const arr = [...filteredBooks];
     if (sortOption === "priceLowHigh") arr.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
@@ -84,244 +88,276 @@ function AllBooksPage() {
   const startIndex = (currentPage - 1) * booksPerPage;
   const currentBooks = sortedBooks.slice(startIndex, startIndex + booksPerPage);
 
-  if (loading) return <p className="text-center mt-4">Loading books...</p>;
+  if (loading) return <p className="text-center mt-4">Loading...</p>;
   if (error) return <p className="text-danger text-center mt-4">Error: {error}</p>;
 
   return (
-    <div className="container mt-4">
-      {/* Hero Banner */}
+    <div className="container-fluid mt-4">
+
+      {/* Sticky Search + Sort Bar */}
       <div
-        className="p-4 mb-5 rounded-3 text-center shadow"
-        style={{ background: "linear-gradient(135deg, #f9f9f9, #ececec)", color: "#333" }}
+        className="position-sticky top-0 bg-white py-3 px-3 shadow-sm mb-4"
+        style={{ zIndex: 50 }}
       >
-        <h2 className="fw-bold">🎉 Summer Reading Sale - Up to 40% Off!</h2>
-        <p>Grab your favorite books before the offer ends! 📚✨</p>
+        <div className="d-flex flex-wrap gap-3 justify-content-between">
+          <input
+            type="text"
+            placeholder="Search books, authors, categories..."
+            className="form-control"
+            style={{ maxWidth: "360px" }}
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+
+          <div className="d-flex flex-wrap gap-2">
+            <select
+              className="form-select"
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-select"
+              value={sortOption}
+              onChange={(e) => {
+                setSortOption(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">Sort</option>
+              <option value="priceLowHigh">Price: Low to High</option>
+              <option value="priceHighLow">Price: High to Low</option>
+              <option value="titleAZ">Title: A-Z</option>
+              <option value="titleZA">Title: Z-A</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* Upcoming Books */}
-      {upcomingBooks.length > 0 && (
-        <div className="mb-5">
-          <h3 className="mb-3">🔮 Upcoming Books</h3>
-          <div className="d-flex overflow-auto gap-3 p-2">
-            {upcomingBooks.map((book) => (
-              <div key={book.id} style={{ minWidth: "220px" }}>
-                <BookCard
-                  book={book}
-                  upcoming
-                  onAddToCart={addToCart}
-                  onPreview={(b) => setPreviewBook(b)}
-                />
+      <div className="row">
+
+        {/* Amazon-style Left Category Sidebar */}
+        <div className="col-md-3 col-lg-2 mb-4">
+          <div className="position-sticky" style={{ top: "90px" }}>
+            <h5 className="fw-bold mb-3">Categories</h5>
+
+            <ul className="list-group shadow-sm">
+              {categories.map((cat) => (
+                <li
+                  key={cat}
+                  className={`list-group-item list-group-item-action ${
+                    selectedCategory === cat ? "active" : ""
+                  }`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setCurrentPage(1);
+                  }}
+                >
+                  {cat}
+                </li>
+              ))}
+
+              <li
+                className="list-group-item list-group-item-action"
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  setSelectedCategory("");
+                  setCurrentPage(1);
+                }}
+              >
+                Clear Filter
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Main Book Grid */}
+        <div className="col-md-9 col-lg-10">
+
+          {/* Banner */}
+          <div
+            className="p-4 mb-4 rounded-3 shadow-sm"
+            style={{ background: "#F3F3F3" }}
+          >
+            <h3 className="fw-bold m-0">🔥 Biggest Sale of the Month</h3>
+            <p className="m-0 text-muted">Up to 60% OFF on bestsellers!</p>
+          </div>
+
+          {/* Book Cards Grid */}
+          <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+            {currentBooks.map((book) => (
+              <div key={book.id} className="col">
+                <div
+                  className="card h-100 p-3 shadow-sm"
+                  style={{
+                    cursor: "pointer",
+                    transition: "0.25s ease",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.transform = "scale(1.05)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
+                  onClick={() => setPreviewBook(book)}
+                >
+                  <img
+                    src={book.imageUrl}
+                    alt={book.title}
+                    className="card-img-top"
+                    style={{
+                      height: "250px",
+                      objectFit: "contain",
+                    }}
+                  />
+
+                  <div className="card-body d-flex flex-column">
+
+                    <h6 className="fw-bold">{book.title}</h6>
+                    <small className="text-muted">by {book.author}</small>
+
+                    <div className="mt-2">
+                      <span className="fw-bold" style={{ fontSize: "1.2rem" }}>
+                        ₹{Number(book.price).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <span className="badge bg-success mt-2">In Stock</span>
+
+                    <button
+                      className="btn btn-warning fw-bold mt-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(book);
+                      }}
+                    >
+                      Add to Cart
+                    </button>
+
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <nav className="mt-4">
+              <ul className="pagination justify-content-center">
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <li
+                    key={idx}
+                    className={`page-item ${
+                      currentPage === idx + 1 ? "active" : ""
+                    }`}
+                  >
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(idx + 1)}
+                    >
+                      {idx + 1}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
         </div>
-      )}
-
-      {/* All Books */}
-      <h2 className="mb-3">📖 All Books</h2>
-
-      {/* Search & Sort */}
-      <div className="mb-4 d-flex align-items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search by title, author, category..."
-          className="form-control w-auto"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-        />
-        <select
-          className="form-select w-auto"
-          value={selectedCategory}
-          onChange={(e) => {
-            setSelectedCategory(e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="">All Categories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-        <select
-          className="form-select w-auto"
-          value={sortOption}
-          onChange={(e) => {
-            setSortOption(e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="">-- Sort By --</option>
-          <option value="priceLowHigh">💰 Price: Low to High</option>
-          <option value="priceHighLow">💸 Price: High to Low</option>
-          <option value="titleAZ">🔤 Title: A to Z</option>
-          <option value="titleZA">🔠 Title: Z to A</option>
-        </select>
       </div>
 
-      {/* Grid of Book Cards */}
-      <div className="row row-cols-1 row-cols-md-3 row-cols-lg-3 g-4">
-        {currentBooks.map((book) => (
-          <div key={book.id} className="col d-flex">
-            <BookCard
-              book={book}
-              onAddToCart={addToCart}
-              onPreview={(b) => setPreviewBook(b)}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <nav className="mt-4">
-          <ul className="pagination justify-content-center">
-            {Array.from({ length: totalPages }).map((_, idx) => (
-              <li
-                key={idx}
-                className={`page-item ${currentPage === idx + 1 ? "active" : ""}`}
-              >
-                <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
-                  {idx + 1}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
-
-      {/* Quick Preview Modal (pure React, no bootstrap JS needed) */}
+      {/* Preview Modal */}
       {previewBook && (
         <div
           className="fixed-top d-flex align-items-center justify-content-center"
-          style={{ background: "rgba(0,0,0,.5)", minHeight: "100vh", zIndex: 1050 }}
+          style={{
+            background: "rgba(0,0,0,.5)",
+            minHeight: "100vh",
+            zIndex: 1050,
+          }}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="bookPreviewTitle"
           onClick={() => setPreviewBook(null)}
         >
           <div
             className="modal-dialog modal-lg modal-dialog-centered"
-            role="document"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title" id="bookPreviewTitle">
-                  {previewBook.title || "Untitled"}
-                </h5>
+                <h5 className="modal-title">{previewBook.title}</h5>
                 <button
                   type="button"
                   className="btn-close"
-                  aria-label="Close"
                   onClick={() => setPreviewBook(null)}
                 />
               </div>
 
               <div className="modal-body">
                 <div className="row g-4">
-                  {/* ✅ Magnifier used here */}
+
+                  {/* Magnifier */}
                   <div className="col-12 col-md-5">
                     <BookMagnifier
-                      src={
-                        previewBook.imageUrl ||
-                        "https://via.placeholder.com/400x560?text=Book+Image"
-                      }
-                      alt={previewBook.title || "Book cover"}
-                      zoom={2.5}      // tweak 2.0–3.0
-                      lensSize={180}  // tweak 140–220
+                      src={previewBook.imageUrl}
+                      zoom={2.5}
+                      lensSize={180}
                     />
                   </div>
 
                   <div className="col-12 col-md-7">
-                    <div className="d-flex flex-column gap-2">
-                      <div className="text-muted small">by</div>
-                      <div className="fw-semibold">
-                        {previewBook.author || "Unknown"}
-                      </div>
+                    <h4 className="fw-bold">{previewBook.title}</h4>
+                    <p className="text-muted">by {previewBook.author}</p>
 
-                      <div className="d-flex align-items-center gap-2 mt-2">
-                        {previewBook.category && (
-                          <span className="badge bg-light text-secondary">
-                            {previewBook.category}
-                          </span>
-                        )}
-                        {previewBook.releaseDate && (
-                          <span className="badge bg-warning text-dark">
-                            Releases{" "}
-                            {new Date(previewBook.releaseDate).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
+                    <h3 className="fw-bold mt-3">
+                      ₹{Number(previewBook.price).toFixed(2)}
+                    </h3>
 
-                      <div className="fs-4 fw-bold mt-2">
-                        {previewBook.price != null
-                          ? `₹${Number(previewBook.price).toFixed(2)}`
-                          : "—"}
-                      </div>
+                    <p className="mt-3">{previewBook.description}</p>
 
-                      {previewBook.description && (
-                        <p className="text-muted mt-2" style={{ whiteSpace: "pre-wrap" }}>
-                          {previewBook.description}
-                        </p>
-                      )}
-
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          className="btn btn-dark"
-                          onClick={() => {
-                            addToCart(previewBook);
-                            setPreviewBook(null);
-                          }}
-                        >
-                          Add to Cart
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary ms-2"
-                          onClick={() => setPreviewBook(null)}
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      className="btn btn-dark mt-2"
+                      onClick={() => {
+                        addToCart(previewBook);
+                        setPreviewBook(null);
+                      }}
+                    >
+                      Add to Cart
+                    </button>
                   </div>
                 </div>
 
-                {/* Quick facts */}
-                <div className="table-responsive mt-4">
-                  <table className="table table-sm align-middle">
-                    <tbody>
-                      <tr>
-                        <th className="w-25">Title</th>
-                        <td>{previewBook.title || "—"}</td>
-                      </tr>
-                      <tr>
-                        <th>Author</th>
-                        <td>{previewBook.author || "—"}</td>
-                      </tr>
-                      <tr>
-                        <th>Category</th>
-                        <td>{previewBook.category || "—"}</td>
-                      </tr>
-                      <tr>
-                        <th>Price</th>
-                        <td>
-                          {previewBook.price != null
-                            ? `₹${Number(previewBook.price).toFixed(2)}`
-                            : "—"}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                {/* /quick facts */}
+                <table className="table table-sm mt-4">
+                  <tbody>
+                    <tr>
+                      <th>Category</th>
+                      <td>{previewBook.category}</td>
+                    </tr>
+                    <tr>
+                      <th>Author</th>
+                      <td>{previewBook.author}</td>
+                    </tr>
+                    <tr>
+                      <th>Price</th>
+                      <td>₹{Number(previewBook.price).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+
             </div>
           </div>
         </div>
